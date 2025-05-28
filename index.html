@@ -1,0 +1,2870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. AI Desktop Assistant</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, getDocs, addDoc, setDoc, doc, where, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Expose Firebase functions globally for the React component
+        window.firebase = {
+            initializeApp,
+            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, collection, query, getDocs, addDoc, setDoc, doc, where, deleteDoc
+        };
+
+        // These variables are expected by the React app.
+        // In a real Canvas environment, they would be injected.
+        // For standalone HTML, they are defined as empty strings.
+        window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        window.__firebase_config = typeof __firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
+        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? window.__initial_auth_token : '';
+    </script>
+
+    <style>
+        /* General Animations */
+        @keyframes ping-fast {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 0; }
+            100% { transform: scale(0.8); opacity: 0.8; }
+        }
+
+        @keyframes pulse-light {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.4; }
+        }
+
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .animate-ping-fast { animation: ping-fast 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+        .animate-pulse-light { animation: pulse-light 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .animate-spin-slow { animation: spin-slow 2s linear infinite; }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .animate-blink { animation: blink 1s step-end infinite; }
+
+        /* Glow Effects */
+        @keyframes glow-red {
+            0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.7), 0 0 20px rgba(239, 68, 68, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(239, 68, 68, 1), 0 0 30px rgba(239, 68, 68, 0.8); }
+        }
+        .animate-glow-red { animation: glow-red 2s infinite alternate; }
+
+        @keyframes glow-blue {
+            0%, 100% { box-shadow: 0 0 10px rgba(59, 130, 246, 0.7), 0 0 20px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(59, 130, 246, 1), 0 0 30px rgba(59, 130, 246, 0.8); }
+        }
+        .glow-blue { animation: glow-blue 2s infinite alternate; }
+        .glow-green { animation: glow-green 2s infinite alternate; } /* Added for listening state */
+
+        @keyframes glow-green {
+            0%, 100% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.7), 0 0 20px rgba(34, 197, 94, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(34, 197, 94, 1), 0 0 30px rgba(34, 197, 94, 0.8); }
+        }
+        .animate-pulse-light-green { animation: pulse-light 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .animate-pulse-light-blue { animation: pulse-light 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+
+        /* Speech Visualizer Animation */
+        @keyframes bar-pulse {
+            0%, 100% { transform: scaleY(0.5); }
+            50% { transform: scaleY(1.2); }
+        }
+
+        /* Radial Gradient Backgrounds for Modes */
+        .bg-radial-gradient-classic {
+            background: radial-gradient(circle at center, rgba(79, 70, 229, 0.3) 0%, transparent 70%);
+        }
+        .bg-radial-gradient-robotic {
+            background: radial-gradient(circle at center, rgba(220, 38, 38, 0.3) 0%, transparent 70%);
+        }
+        .bg-radial-gradient-darker { /* New theme gradient */
+            background: radial-gradient(circle at center, rgba(0, 128, 128, 0.3) 0%, transparent 70%); /* Teal */
+        }
+        .bg-radial-gradient-futuristic { /* New theme gradient */
+            background: radial-gradient(circle at center, rgba(147, 51, 234, 0.3) 0%, transparent 70%); /* Violet */
+        }
+
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #333;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* GUI Panel Specific Styles */
+        .gui-panel {
+            position: relative;
+            border: 1px solid; /* Base border */
+            transition: all 0.3s ease-in-out;
+        }
+
+        .gui-panel::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: inherit;
+            border: 1px solid transparent;
+            /* Using CSS variables that will be set by JS based on theme */
+            /* Note: Direct CSS variables from JS in this manner are complex with Tailwind.
+               The React component's getThemeClasses directly injects Tailwind classes,
+               which is the intended behavior. This CSS block is for the fixed animations. */
+            pointer-events: none;
+            animation: border-glow 4s infinite alternate;
+        }
+
+        .gui-panel .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.4), transparent);
+            animation: scan-line 5s infinite linear;
+        }
+
+        @keyframes border-glow {
+            0% { opacity: 0.7; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.005); }
+            100% { opacity: 0.7; transform: scale(1); }
+        }
+
+        @keyframes scan-line {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+
+        /* Disk Scan Animation */
+        @keyframes disk-scan-pulse {
+            0%, 100% { transform: scale(0.8); opacity: 0.2; }
+            50% { transform: scale(1.1); opacity: 0.5; }
+        }
+
+        @keyframes disk-scan-rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .disk-scan-pulse { animation: disk-scan-pulse 2s infinite alternate; }
+        .disk-scan-rotate { animation: disk-scan-rotate 5s linear infinite; }
+
+        /* Graph Dot Pulse */
+        @keyframes graph-dot-pulse {
+            0%, 100% { r: 1; opacity: 1; }
+            50% { r: 2.5; opacity: 0.5; }
+        }
+        .graph-dot-pulse {
+            animation: graph-dot-pulse 1.5s infinite alternate;
+        }
+
+        /* New Shimmer for Threat Alert */
+        @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: 200px 0; }
+        }
+
+        .animate-shimmer {
+            background: linear-gradient(90deg, #272727, #404040, #272727); /* Darker background for shimmer */
+            background-size: 400px 100%;
+            animation: shimmer 1.2s linear infinite;
+            padding: 2px 5px;
+            border-radius: 4px;
+            display: inline-block; /* To contain shimmer effect */
+        }
+
+
+        /* Ensure responsive layout for smaller screens */
+        @media (max-width: 768px) {
+            .grid-cols-1.md\:grid-cols-3 {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto auto auto auto auto; /* Adjusted for new panels stacking */
+            }
+            .md\:grid-rows-\[1fr_1fr_auto\] { /* Old: md:grid-rows-[1fr_1fr] */
+                grid-template-rows: auto;
+            }
+            .col-span-1, .col-span-full {
+                grid-column: auto;
+            }
+            .h-\[90vh\] {
+                height: auto; /* Allow height to adjust */
+                min-height: 90vh; /* Ensure minimum height */
+            }
+        }
+
+        /* System Map Specific Styles */
+        .system-map-canvas {
+            background-color: rgba(0, 0, 0, 0.1); /* Slightly transparent background */
+            border-radius: 0.5rem;
+        }
+        @keyframes node-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+        }
+        .node-active {
+            animation: node-pulse 1.5s infinite alternate;
+        }
+
+        /* Alert Styles */
+        .alert-enter {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        .alert-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 300ms ease-out, transform 300ms ease-out;
+        }
+        .alert-exit {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .alert-exit-active {
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 300ms ease-in, transform 300ms ease-in;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Ensure React and ReactDOM are available globally
+        const { useState, useEffect, useRef, useCallback } = React;
+        const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, query, getDocs, addDoc, setDoc, doc, where, deleteDoc } = window.firebase;
+
+        // Main App component for the J.A.R.V.I.S. AI Assistant
+        function App() {
+            // State variables
+            const [listening, setListening] = useState(false); // Is the AI currently listening?
+            const [speaking, setSpeaking] = useState(false);   // Is the AI currently speaking?
+            const [response, setResponse] = useState("Initializing systems..."); // AI's full current response
+            const [displayedResponse, setDisplayedResponse] = useState(""); // The response being "typed"
+            const [input, setInput] = useState('');           // User's text input
+            const [loading, setLoading] = useState(false);     // Is the AI processing a request?
+            const [messages, setMessages] = useState([]);      // Stores the conversation history
+            const [trainingData, setTrainingData] = useState([]); // Stores user-trained Q&A pairs
+            const [showTrainingModal, setShowTrainingModal] = useState(false); // Controls training modal visibility
+            const [correctedResponse, setCorrectedResponse] = useState(''); // Input for corrected response
+            const [lastUserInput, setLastUserInput] = useState(''); // Stores the last user input for training
+            const [lastJarvisResponse, setLastJarvisResponse] = useState(''); // Stores the last J.A.R.V.I.S. response for training
+            const [mode, setMode] = useState('classic');      // 'classic' or 'robotic'
+            const [showMenuModal, setShowMenuModal] = useState(false); // Controls menu modal visibility
+            const [voicePitch, setVoicePitch] = useState(1);  // Voice pitch setting
+            const [voiceRate, setVoiceRate] = useState(1);    // Voice rate setting
+            const [typingSpeed, setTypingSpeed] = useState(20); // Typing speed setting (ms per char)
+            const [showConfirmClearModal, setShowConfirmClearModal] = useState(false); // Confirmation for clearing data
+            const [aiPersona, setAiPersona] = useState('default'); // AI response style/persona
+            const [selectedTheme, setSelectedTheme] = useState('default'); // Default, darker, futuristic
+
+            // New states for LLM features
+            const [showBrainstormModal, setShowBrainstormModal] = useState(false);
+            const [brainstormTopic, setBrainstormTopic] = useState('');
+            const [showQuizModal, setShowQuizModal] = useState(false); // New state for quiz modal
+            const [quizQuestion, setQuizQuestion] = useState(''); // New state for quiz question input
+            const [quizFormat, setQuizFormat] = useState('text'); // New state for quiz answer format ('text' or 'code')
+            const [showCreativeWritingModal, setShowCreativeWritingModal] = useState(false); // New state for creative writing modal
+            const [creativeWritingTopic, setCreativeWritingTopic] = useState(''); // New state for creative writing topic
+            const [creativeWritingType, setCreativeWritingType] = useState('story'); // 'story', 'poem', 'script'
+            const [showCodeGenerationModal, setShowCodeGenerationModal] = useState(false); // New state for code generation modal
+            const [codeGenerationPrompt, setCodeGenerationPrompt] = useState(''); // New state for code generation prompt
+            const [codeLanguage, setCodeLanguage] = useState('javascript'); // 'javascript', 'python', 'java', etc.
+
+            // New states for Image Understanding/Generation
+            const [showImageDescriptionModal, setShowImageDescriptionModal] = useState(false);
+            const [imageFile, setImageFile] = useState(null);
+            const [imageDescriptionPrompt, setImageDescriptionPrompt] = useState('');
+            const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+            const [showImageGenerationModal, setShowImageGenerationModal] = useState(false);
+            const [imageGenerationPrompt, setImageGenerationPrompt] = useState('');
+            const [generatedImageUrl, setGeneratedImageUrl] = useState(null);
+            const [isImageGenerating, setIsImageGenerating] = useState(false);
+
+
+            // Simulated System Data for GUI
+            const [cpuUsage, setCpuUsage] = useState(0);
+            const [cpuCoresUsage, setCpuCoresUsage] = useState([0, 0, 0, 0]); // Individual core usage
+            const [gpuUsage, setGpuUsage] = useState(0); // GPU usage
+            const [ramUsage, setRamUsage] = useState(0);
+            const [ramFree, setRamFree] = useState(0); // Free RAM percentage
+            const [networkActivity, setNetworkActivity] = useState(0); // Network In
+            const [networkUpload, setNetworkUpload] = useState(0); // Network Out
+            const [threatLevel, setThreatLevel] = useState('Stable');
+            const [anomalyCount, setAnomalyCount] = useState(0);
+            const [diskScanProgress, setDiskScanProgress] = useState(0); // For disk graph
+            const [performanceData, setPerformanceData] = useState([]); // For performance graph
+
+            // Location-aware data
+            const [localTime, setLocalTime] = useState(new Date().toLocaleTimeString());
+            const [weatherData, setWeatherData] = useState({ temperature: 'Loading...', description: '', icon: '' });
+            const [kenyanNews, setKenyanNews] = useState([]);
+            const [userLocation, setUserLocation] = useState(null); // {latitude, longitude}
+            const [locationStatus, setLocationStatus] = useState('Determining...'); // 'Determining...', 'Enabled', 'Denied', 'Error'
+            const [isOnline, setIsOnline] = useState(navigator.onLine); // Online/Offline status
+
+            // Firebase state
+            const [db, setDb] = useState(null);
+            const [auth, setAuth] = useState(null);
+            const [userId, setUserId] = useState(null);
+            const [isAuthReady, setIsAuthReady] = useState(false);
+
+            const recognitionRef = useRef(null);               // Reference to the SpeechRecognition object
+            const messagesEndRef = useRef(null);               // Reference for auto-scrolling chat
+            const typingTimeoutRef = useRef(null);             // Ref for typing animation timeout
+            const systemMapCanvasRef = useRef(null);           // Ref for the system map canvas
+            const systemMapAnimationRef = useRef(null);        // Ref for system map animation frame
+            const [systemNodes, setSystemNodes] = useState([]); // Nodes for the system map
+            const [systemConnections, setSystemConnections] = useState([]); // Connections for the system map
+            const [dataFlowParticles, setDataFlowParticles] = useState([]); // Animated particles for data flow
+
+            // New state for Alerts
+            const [currentAlert, setCurrentAlert] = useState(null); // { message: string, type: 'info' | 'warning' | 'error' }
+            const alertTimeoutRef = useRef(null);
+
+            // Function to show an alert
+            const showAlert = useCallback((message, type = 'info', duration = 5000) => {
+                setCurrentAlert({ message, type });
+                if (alertTimeoutRef.current) {
+                    clearTimeout(alertTimeoutRef.current);
+                }
+                alertTimeoutRef.current = setTimeout(() => {
+                    setCurrentAlert(null);
+                }, duration);
+            }, []);
+
+            // Function to handle typing animation
+            const typeResponse = useCallback((text) => {
+                let i = 0;
+                setDisplayedResponse(""); // Clear previous displayed text
+                if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                }
+
+                const typeChar = () => {
+                    if (i < text.length) {
+                        setDisplayedResponse((prev) => prev + text.charAt(i));
+                        i++;
+                        typingTimeoutRef.current = setTimeout(typeChar, typingSpeed); // Use dynamic typingSpeed
+                    }
+                };
+                typeChar();
+            }, [typingSpeed]); // Depend on typingSpeed
+
+            // Effect to initialize Firebase and SpeechRecognition on component mount
+            useEffect(() => {
+                // Initialize Firebase
+                try {
+                    const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+                    const firebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
+
+                    const app = initializeApp(firebaseConfig);
+                    const firestore = getFirestore(app);
+                    const firebaseAuth = getAuth(app);
+
+                    setDb(firestore);
+                    setAuth(firebaseAuth);
+
+                    // Sign in anonymously or with custom token
+                    const signIn = async () => {
+                        if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
+                            await signInWithCustomToken(firebaseAuth, window.__initial_auth_token);
+                        } else {
+                            await signInAnonymously(firebaseAuth);
+                        }
+                    };
+                    signIn();
+
+                    // Set up auth state listener
+                    onAuthStateChanged(firebaseAuth, (user) => {
+                        if (user) {
+                            setUserId(user.uid);
+                            setIsAuthReady(true);
+                        } else {
+                            setUserId(null);
+                            setIsAuthReady(true); // Still ready, just no user
+                        }
+                    });
+
+                } catch (error) {
+                    console.error("Firebase initialization error:", error);
+                    setResponse("Error initializing app services. Please try again later.");
+                    showAlert("Error initializing app services.", "error");
+                }
+
+                // Initialize SpeechRecognition
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (SpeechRecognition) {
+                    recognitionRef.current = new SpeechRecognition();
+                    recognitionRef.current.continuous = false;
+                    recognitionRef.current.interimResults = false;
+
+                    recognitionRef.current.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript;
+                        setInput(transcript);
+                        setListening(false);
+                        processCommand(transcript);
+                    };
+
+                    recognitionRef.current.onend = () => {
+                        setListening(false);
+                    };
+
+                    recognitionRef.current.onerror = (event) => {
+                        console.error("Speech recognition error:", event.error);
+                        const errorMessage = `Speech recognition error: ${event.error}. Please try again.`;
+                        setResponse(errorMessage);
+                        setMessages((prev) => [...prev, { type: 'jarvis', text: errorMessage, timestamp: new Date() }]);
+                        setListening(false);
+                        setLoading(false);
+                        showAlert(errorMessage, "error");
+                    };
+                } else {
+                    const unsupportedMessage = "Speech Recognition is not supported in this browser. Please use text input.";
+                    setResponse(unsupportedMessage);
+                    setMessages((prev) => [...prev, { type: 'jarvis', text: unsupportedMessage, timestamp: new Date() }]);
+                    showAlert(unsupportedMessage, "warning");
+                }
+
+                // Determine time-based greeting
+                const currentHour = new Date().getHours();
+                let timeGreeting = "";
+                if (currentHour < 12) {
+                    timeGreeting = "Good morning.";
+                } else if (currentHour < 18) {
+                    timeGreeting = "Good afternoon.";
+                } else {
+                    timeGreeting = "Good evening.";
+                }
+
+                // Combine with introduction
+                const initialGreeting = `${timeGreeting} I am AI Assistant created by Engineer Reagan. How can I assist you?`;
+                setMessages([{ type: 'jarvis', text: initialGreeting, timestamp: new Date() }]);
+                setResponse(initialGreeting); // Set full response
+                typeResponse(initialGreeting); // Start typing animation for initial greeting
+                speak(initialGreeting); // Make sure the initial greeting is spoken
+
+                // Setup online/offline event listeners
+                const handleOnline = () => setIsOnline(true);
+                const handleOffline = () => setIsOnline(false);
+
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+
+                // Cleanup function for speech synthesis and typing timeout
+                return () => {
+                    if (window.speechSynthesis) {
+                        window.speechSynthesis.cancel();
+                    }
+                    if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                    }
+                    if (alertTimeoutRef.current) {
+                        clearTimeout(alertTimeoutRef.current);
+                    }
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
+                };
+            }, [typeResponse, showAlert]); // Add typeResponse and showAlert to dependencies as they are callbacks
+
+            // Effect to load training data once Firebase auth is ready and db is available
+            useEffect(() => {
+                if (isAuthReady && db && userId) {
+                    loadTrainingData();
+                }
+            }, [isAuthReady, db, userId]); // Dependencies ensure this runs when auth/db are ready
+
+            // Effect to scroll to the bottom of the messages container when messages change
+            useEffect(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [messages]);
+
+            // Simulated system data updates
+            useEffect(() => {
+                // Initialize system nodes and connections
+                const nodes = [
+                    { id: 'core', name: 'Core AI', x: 0.5, y: 0.5, radius: 15, status: 'normal' },
+                    { id: 'sub1', name: 'Subsystem A', x: 0.2, y: 0.2, radius: 10, status: 'normal' },
+                    { id: 'sub2', name: 'Subsystem B', x: 0.8, y: 0.2, radius: 10, status: 'normal' },
+                    { id: 'sub3', name: 'Subsystem C', x: 0.2, y: 0.8, radius: 10, status: 'normal' },
+                    { id: 'sub4', name: 'Subsystem D', x: 0.8, y: 0.8, radius: 10, status: 'normal' },
+                    { id: 'net1', name: 'Network Gateway', x: 0.5, y: 0.1, radius: 8, status: 'normal' },
+                    { id: 'db1', name: 'Database', x: 0.1, y: 0.5, radius: 8, status: 'normal' },
+                ];
+                const connections = [
+                    { from: 'core', to: 'sub1' }, { from: 'core', to: 'sub2' },
+                    { from: 'core', to: 'sub3' }, { from: 'core', to: 'sub4' },
+                    { from: 'core', to: 'net1' }, { from: 'core', to: 'db1' },
+                    { from: 'sub1', to: 'db1' }, { from: 'sub2', to: 'net1' },
+                    { from: 'sub3', to: 'sub4' }
+                ];
+                setSystemNodes(nodes);
+                setSystemConnections(connections);
+
+                const interval = setInterval(() => {
+                    setCpuUsage(Math.floor(Math.random() * 40) + 20); // 20-60%
+                    setCpuCoresUsage(Array.from({ length: 4 }, () => Math.floor(Math.random() * 30) + 10)); // 10-40% per core
+                    setGpuUsage(Math.floor(Math.random() * 20) + 5); // 5-25% GPU usage
+                    setRamUsage(Math.floor(Math.random() * 30) + 30); // 30-60%
+                    setRamFree(100 - ramUsage); // Calculate free RAM
+                    setNetworkActivity(Math.floor(Math.random() * 1000)); // 0-1000 KB/s In
+                    setNetworkUpload(Math.floor(Math.random() * 500)); // 0-500 KB/s Out
+
+                    if (Math.random() < 0.1) { // 10% chance of anomaly
+                        setAnomalyCount(prev => prev + 1);
+                        setThreatLevel('Elevated');
+                        showAlert("Threat Level Elevated!", "error", 7000);
+                    } else if (anomalyCount > 0 && Math.random() < 0.3) { // 30% chance to reduce anomaly
+                        setAnomalyCount(prev => Math.max(0, prev - 1));
+                        if (anomalyCount - 1 <= 0) setThreatLevel('Stable');
+                    } else if (anomalyCount === 0) {
+                        setThreatLevel('Stable');
+                    }
+
+                    // Simulate disk scan progress
+                    setDiskScanProgress(prev => (prev + 5) % 101); // 0-100, loops
+
+                    // Simulate performance data for line graph
+                    setPerformanceData(prev => {
+                        const newData = [...prev, Math.floor(Math.random() * 50) + 50]; // 50-100
+                        if (newData.length > 20) { // Keep last 20 data points
+                            return newData.slice(1);
+                        }
+                        return newData;
+                    });
+
+                    // Simulate node activity for system map
+                    setSystemNodes(prevNodes => prevNodes.map(node => {
+                        if (Math.random() < 0.2) { // 20% chance to change status
+                            const statuses = ['normal', 'active', 'warning'];
+                            const newStatus = statuses[Math.floor(Math.random() * statuses.length)];
+                            return { ...node, status: newStatus };
+                        }
+                        return node;
+                    }));
+
+                    // Simulate data flow particles
+                    setDataFlowParticles(prevParticles => {
+                        const newParticles = prevParticles.map(p => {
+                            const connection = systemConnections.find(conn => conn.from === p.fromNodeId && conn.to === p.toNodeId);
+                            if (!connection) return p; // Should not happen
+
+                            const fromNode = systemNodes.find(node => node.id === p.fromNodeId);
+                            const toNode = systemNodes.find(node => node.id === p.toNodeId);
+                            if (!fromNode || !toNode) return p;
+
+                            // Calculate direction vector
+                            const dx = toNode.x - fromNode.x;
+                            const dy = toNode.y - fromNode.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+
+                            // Normalize and scale by speed
+                            const speed = 0.01;
+                            const moveX = (dx / distance) * speed;
+                            const moveY = (dy / distance) * speed;
+
+                            let newProgress = p.progress + speed / distance; // Progress along the connection
+                            if (newProgress >= 1) {
+                                // Particle reached destination, reset or remove
+                                return null; // Mark for removal
+                            }
+
+                            return { ...p, progress: newProgress };
+                        }).filter(p => p !== null); // Filter out removed particles
+
+                        // Add new particles occasionally
+                        if (Math.random() < 0.3 && systemConnections.length > 0) { // 30% chance to add a new particle
+                            const randomConnection = systemConnections[Math.floor(Math.random() * systemConnections.length)];
+                            newParticles.push({
+                                id: Math.random(),
+                                fromNodeId: randomConnection.from,
+                                toNodeId: randomConnection.to,
+                                progress: 0, // Starts at the beginning of the connection
+                                color: mode === 'robotic' ? 'yellow' : 'cyan'
+                            });
+                        }
+                        return newParticles;
+                    });
+
+                }, 2000); // Update every 2 seconds
+
+                return () => clearInterval(interval);
+            }, [anomalyCount, ramUsage, systemNodes, systemConnections, showAlert, mode]); // Add dependencies for system map updates
+
+            // Effect to fetch local time, weather, and news for Kenya
+            useEffect(() => {
+                const fetchLocalData = async () => {
+                    setLocalTime(new Date().toLocaleTimeString());
+
+                    // --- Geolocation for accurate weather ---
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            async (position) => {
+                                const { latitude, longitude } = position.coords;
+                                setUserLocation({ latitude, longitude });
+                                setLocationStatus('Enabled');
+
+                                // Fetch weather using actual coordinates
+                                try {
+                                    const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+                                    if (weatherResponse.ok) {
+                                        const data = await weatherResponse.json();
+                                        if (data.current_weather) {
+                                            const temp = data.current_weather.temperature;
+                                            let desc = 'Clear skies';
+                                            if (temp > 25) desc = 'Warm and sunny';
+                                            else if (temp < 18) desc = 'Cooler weather';
+                                            setWeatherData({
+                                                temperature: `${temp}°C`,
+                                                description: desc,
+                                                icon: '', // Placeholder, would need to map weather codes to icons
+                                            });
+                                        } else {
+                                            setWeatherData({ temperature: 'N/A', description: 'No current weather data', icon: '' });
+                                        }
+                                    } else {
+                                        console.error('Failed to fetch weather data:', weatherResponse.statusText);
+                                        setWeatherData({ temperature: 'Error', description: 'Failed to load weather', icon: '' });
+                                        showAlert("Failed to load weather data.", "warning");
+                                    }
+                                } catch (error) {
+                                    console.error('Error fetching weather data:', error);
+                                    setWeatherData({ temperature: 'Error', description: 'Network error', icon: '' });
+                                    showAlert("Network error fetching weather data.", "warning");
+                                }
+                            },
+                            (error) => {
+                                console.error("Geolocation error:", error.code, error.message);
+                                let statusMessage = 'Error';
+                                switch (error.code) {
+                                    case error.PERMISSION_DENIED:
+                                        statusMessage = 'Permission Denied (Check browser settings or policy)'; // More specific message
+                                        break;
+                                    case error.POSITION_UNAVAILABLE:
+                                        statusMessage = 'Position Unavailable';
+                                        break;
+                                    case error.TIMEOUT:
+                                        statusMessage = 'Timeout';
+                                        break;
+                                    default:
+                                        statusMessage = 'Unknown Error';
+                                }
+                                setLocationStatus(statusMessage);
+                                setWeatherData({ temperature: 'N/A', description: `Location ${statusMessage}`, icon: '' });
+                                showAlert(`Geolocation ${statusMessage}.`, "warning");
+                                // Fallback to Nairobi if location denied or error
+                                fetchWeatherForNairobi();
+                            }
+                        );
+                    } else {
+                        setLocationStatus('Not Supported');
+                        setWeatherData({ temperature: 'N/A', description: 'Geolocation not supported', icon: '' });
+                        showAlert("Geolocation not supported by your browser.", "warning");
+                        fetchWeatherForNairobi(); // Fallback to Nairobi
+                    }
+
+                    // --- Simulated Kenyan News Headlines ---
+                    // In a real application, you'd integrate with a news API (e.g., NewsAPI.org)
+                    // but for security and API key reasons, we'll simulate.
+                    setKenyanNews([
+                        { title: "Local Tech Startup Secures Major Funding", url: "#" },
+                        { title: "New Infrastructure Project Announced in Nairobi", url: "#" },
+                        { title: "Kenyan Athletes Shine in International Marathon", url: "#" },
+                    ]);
+                };
+
+                const fetchWeatherForNairobi = async () => {
+                    try {
+                        const weatherResponse = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-1.2921&longitude=36.8219&current_weather=true');
+                        if (weatherResponse.ok) {
+                            const data = await weatherResponse.json();
+                            if (data.current_weather) {
+                                const temp = data.current_weather.temperature;
+                                let desc = 'Clear skies';
+                                if (temp > 25) desc = 'Warm and sunny';
+                                else if (temp < 18) desc = 'Cooler weather';
+                                setWeatherData({
+                                    temperature: `${temp}°C`,
+                                    description: desc,
+                                    icon: '',
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Error fetching Nairobi weather fallback:", error);
+                    }
+                };
+
+
+                fetchLocalData();
+                const localDataInterval = setInterval(fetchLocalData, 60000); // Update every minute
+
+                return () => clearInterval(localDataInterval);
+            }, [isOnline, showAlert]); // Rerun if online status changes, to retry fetching online data
+
+            // Function to load training data from Firestore
+            const loadTrainingData = async () => {
+                if (!db || !userId) {
+                    console.warn("Firestore or User ID not available for loading training data.");
+                    return;
+                }
+                setLoading(true);
+                try {
+                    const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+                    const trainingCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/jarvis_training`);
+                    const q = query(trainingCollectionRef);
+                    const querySnapshot = await getDocs(q);
+                    const loadedData = [];
+                    querySnapshot.forEach((doc) => {
+                        loadedData.push(doc.data());
+                    });
+                    setTrainingData(loadedData);
+                    console.log("Training data loaded:", loadedData);
+                    showAlert("Training data loaded.", "info");
+                } catch (error) {
+                    console.error("Error loading training data:", error);
+                    setResponse("Error loading past training data.");
+                    showAlert("Error loading past training data.", "error");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // Function to save a training record to Firestore
+            const saveTrainingRecord = async (userText, jarvisText) => {
+                if (!db || !userId) {
+                    console.error("Firestore or User ID not available. Cannot save training data.");
+                    showAlert("Firestore or User ID not available. Cannot save training data.", "error");
+                    return;
+                }
+                setLoading(true);
+                try {
+                    const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+                    const trainingCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/jarvis_training`);
+
+                    // Query for existing record based on userInput
+                    const q = query(trainingCollectionRef, where("userInput", "==", userText));
+                    const querySnapshot = await getDocs(q);
+
+                    if (!querySnapshot.empty) {
+                        // Update existing document
+                        const docToUpdate = querySnapshot.docs[0];
+                        await setDoc(doc(db, `artifacts/${appId}/users/${userId}/jarvis_training`, docToUpdate.id), {
+                            userInput: userText,
+                            jarvisResponse: jarvisText,
+                            timestamp: new Date().toISOString(),
+                        }, { merge: true }); // Use merge to update fields without overwriting the entire document
+                        console.log("Training record updated:", userText);
+                    } else {
+                        // Add new document
+                        await addDoc(trainingCollectionRef, {
+                            userInput: userText,
+                            jarvisResponse: jarvisText,
+                            timestamp: new Date().toISOString(),
+                        });
+                        console.log("Training record added:", userText);
+                    }
+
+                    // Reload training data to update local state
+                    await loadTrainingData();
+                    setResponse("Training data saved successfully!");
+                    speak("Training data saved successfully!");
+                    showAlert("Training data saved successfully!", "success");
+                } catch (error) {
+                    console.error("Error saving training data:", error);
+                    setResponse("Error saving training data.");
+                    speak("Error saving training data.");
+                    showAlert("Error saving training data.", "error");
+                } finally {
+                    setLoading(false);
+                    setShowTrainingModal(false); // Close modal after saving
+                }
+            };
+
+            // Function to start speech recognition
+            const startListening = () => {
+                if (recognitionRef.current && !listening) {
+                    setListening(true);
+                    setResponse("Listening...");
+                    typeResponse("Listening..."); // Type "Listening..."
+                    setInput('');
+                    window.speechSynthesis.cancel();
+                    setSpeaking(false);
+                    showAlert("Listening...", "info");
+                    try {
+                        recognitionRef.current.start();
+                    } catch (e) {
+                        console.error("Error starting speech recognition:", e);
+                        const errorMessage = "Could not start listening. Please try again.";
+                        setResponse(errorMessage);
+                        typeResponse(errorMessage);
+                        setMessages((prev) => [...prev, { type: 'jarvis', text: errorMessage, timestamp: new Date() }]);
+                        setListening(false);
+                        showAlert(errorMessage, "error");
+                    }
+                }
+            };
+
+            // Function to convert text to speech
+            const speak = (text) => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    setSpeaking(true);
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'en-US';
+                    utterance.pitch = voicePitch; // Use dynamic voicePitch
+                    utterance.rate = voiceRate;  // Use dynamic voiceRate
+
+                    utterance.onstart = () => setSpeaking(true);
+                    utterance.onend = () => setSpeaking(false);
+                    utterance.onerror = (event) => {
+                        console.error("Speech synthesis error:", event.error);
+                        setSpeaking(false);
+                        showAlert("Speech synthesis error.", "error");
+                    };
+
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    console.warn("Speech Synthesis is not supported in this browser.");
+                    setSpeaking(false);
+                    showAlert("Speech Synthesis not supported.", "warning");
+                }
+            };
+
+            // Function to process user commands (voice or text)
+            const processCommand = async (command) => {
+                if (!command.trim()) {
+                    const noCommandMessage = "Please provide a command.";
+                    setResponse(noCommandMessage);
+                    typeResponse(noCommandMessage);
+                    setMessages((prev) => [...prev, { type: 'jarvis', text: noCommandMessage, timestamp: new Date() }]);
+                    speak(noCommandMessage);
+                    showAlert("Please provide a command.", "info");
+                    return;
+                }
+
+                // Handle commands that open modals
+                if (command.toLowerCase().includes("ask quiz question")) {
+                    handleAskQuiz();
+                    setInput('');
+                    return;
+                }
+                if (command.toLowerCase().includes("brainstorm idea")) {
+                    handleBrainstormIdea();
+                    setInput('');
+                    return;
+                }
+                if (command.toLowerCase().includes("write a story") || command.toLowerCase().includes("write a poem") || command.toLowerCase().includes("write a script")) {
+                    handleCreativeWriting(command.toLowerCase().includes("story") ? 'story' : command.toLowerCase().includes("poem") ? 'poem' : 'script');
+                    setInput('');
+                    return;
+                }
+                if (command.toLowerCase().includes("generate code") || command.toLowerCase().includes("write code")) {
+                    handleCodeGeneration();
+                    setInput('');
+                    return;
+                }
+                if (command.toLowerCase().includes("summarize chat")) {
+                    handleSummarizeChat();
+                    setInput('');
+                    return;
+                }
+                if (command.toLowerCase().includes("describe image") || command.toLowerCase().includes("analyze image")) {
+                    handleImageDescription();
+                    setInput('');
+                    return;
+                }
+                if (command.toLowerCase().includes("create image") || command.toLowerCase().includes("generate image")) {
+                    handleImageGeneration();
+                    setInput('');
+                    return;
+                }
+
+
+                // Store the current user input for potential training
+                setLastUserInput(command);
+                setMessages((prev) => [...prev, { type: 'user', text: command, timestamp: new Date() }]);
+                setLoading(true);
+                setResponse("Thinking...");
+                typeResponse("Thinking..."); // Type "Thinking..."
+                showAlert("Processing command...", "info");
+
+                let aiResponseText = '';
+
+                // 1. Check hardcoded commands first
+                if (command.toLowerCase().includes("what time is it")) {
+                    const now = new Date();
+                    const time = now.toLocaleTimeString();
+                    const date = now.toLocaleDateString();
+                    aiResponseText = `The current time is ${time} on ${date}.`;
+                } else if (command.toLowerCase().includes("tell me a joke")) {
+                    aiResponseText = "Why don't scientists trust atoms? Because they make up everything!";
+                } else if (command.toLowerCase().includes("how are you")) {
+                    aiResponseText = "I am functioning optimally, thank you for asking.";
+                } else if (command.toLowerCase().includes("simulate disk scan")) {
+                    aiResponseText = "Initiating simulated disk scan. No issues detected in this virtual environment.";
+                } else if (command.toLowerCase().includes("check system diagnostics")) {
+                    aiResponseText = "Running simulated system diagnostics. All virtual parameters indicate normal operation.";
+                } else if (command.toLowerCase().includes("show quick actions")) {
+                    aiResponseText = "I can simulate disk scans, check diagnostics, or perform a virtual system reboot. What would you like?";
+                } else if (command.toLowerCase().includes("hello jarvis") || command.toLowerCase() === "hello") {
+                    aiResponseText = "Hello there! How may I assist you today?";
+                } else if (command.toLowerCase().includes("thank you") || command.toLowerCase().includes("thanks")) {
+                    aiResponseText = "You're most welcome. Is there anything else I can do?";
+                } else if (command.toLowerCase().includes("what is your purpose")) {
+                    aiResponseText = "My purpose is to assist you with information, tasks, and creative endeavors. I am here to serve.";
+                } else if (command.toLowerCase().includes("who created you")) {
+                    aiResponseText = "I was created by Engineer Reagan.";
+                } else if (command.toLowerCase().includes("what can you do")) {
+                    aiResponseText = "I can answer your questions, generate creative text, write code, describe images, generate images, and manage your trained responses. I also monitor system status and network activity.";
+                }
+                else {
+                    // If offline, limit responses to trained data and hardcoded commands
+                    if (!isOnline) {
+                        const trainedMatch = trainingData.find(
+                            (record) => record.userInput.toLowerCase() === command.toLowerCase()
+                        );
+                        if (trainedMatch) {
+                            aiResponseText = trainedMatch.jarvisResponse;
+                        } else {
+                            aiResponseText = "I am currently offline. My capabilities are limited to pre-trained responses and basic functions. I cannot access the web or generate new information.";
+                        }
+                    } else {
+                        // 2. Check trained data (if online)
+                        const trainedMatch = trainingData.find(
+                            (record) => record.userInput.toLowerCase() === command.toLowerCase()
+                        );
+
+                        if (trainedMatch) {
+                            aiResponseText = trainedMatch.jarvisResponse;
+                            console.log("Response from trained data:", aiResponseText);
+                        } else {
+                            // 3. If no hardcoded or trained match, perform web search and then send to Gemini API
+                            let chatHistoryForGemini = messages.map(msg => ({
+                                role: msg.type === 'user' ? 'user' : 'model',
+                                parts: [{ text: msg.text }]
+                            }));
+
+                            // Prepend AI persona instruction to the current command
+                            let personaInstruction = '';
+                            if (aiPersona === 'formal') {
+                                personaInstruction = 'Respond in a formal and professional tone.';
+                            } else if (aiPersona === 'casual') {
+                                personaInstruction = 'Respond in a casual and friendly tone.';
+                            }
+                            else if (aiPersona === 'concise') {
+                                personaInstruction = 'Respond concisely and to the point.';
+                            }
+                            // Only add instruction if it's not 'default'
+                            const finalCommand = aiPersona !== 'default' ? `${personaInstruction} ${command}`.trim() : command;
+
+                            let searchResultsText = '';
+                            try {
+                                setResponse("Searching the web...");
+                                typeResponse("Searching the web...");
+                                showAlert("Searching the web...", "info");
+
+                                // Simulate Google Search tool call using Gemini API to generate search results
+                                const apiKey = ""; // Canvas will provide this at runtime
+                                const simulatedSearchResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        contents: [{
+                                            role: "user",
+                                            parts: [{ text: `Perform a concise web search for: "${command}". Provide key snippets from reliable sources, including title, snippet, and URL. Format as JSON with a 'results' array containing objects with 'title', 'snippet', and 'url' properties. Limit to 3 results.` }]
+                                        }],
+                                        generationConfig: {
+                                            responseMimeType: "application/json",
+                                            responseSchema: {
+                                                type: "OBJECT",
+                                                properties: {
+                                                    "results": {
+                                                        "type": "ARRAY",
+                                                        "items": {
+                                                            "type": "OBJECT",
+                                                            "properties": {
+                                                                "title": { "type": "STRING" },
+                                                                "snippet": { "type": "STRING" },
+                                                                "url": { "type": "STRING" }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    })
+                                });
+                                const simulatedSearchResult = await simulatedSearchResponse.json();
+
+                                if (simulatedSearchResult.candidates && simulatedSearchResult.candidates.length > 0 &&
+                                    simulatedSearchResult.candidates[0].content && simulatedSearchResult.candidates[0].content.parts &&
+                                    simulatedSearchResult.candidates[0].content.parts.length > 0) {
+                                    const rawJson = simulatedSearchResult.candidates[0].content.parts[0].text;
+                                    const parsedResults = JSON.parse(rawJson).results;
+                                    if (parsedResults && parsedResults.length > 0) {
+                                        searchResultsText = "\n\nWeb Search Results:\n";
+                                        parsedResults.slice(0, 3).forEach((res, index) => { // Take top 3 results
+                                            searchResultsText += `${index + 1}. ${res.title}: ${res.snippet} (${res.url})\n`;
+                                        });
+                                    }
+                                }
+                            } catch (searchError) {
+                                console.error("Error during web search simulation:", searchError);
+                                searchResultsText = "\n\n(Could not perform web search due to an error.)\n";
+                                showAlert("Web search failed.", "error");
+                            }
+
+                            // Append search results to the chat history for Gemini
+                            chatHistoryForGemini.push({
+                                role: "user",
+                                parts: [{ text: `User asked: "${finalCommand}". ${searchResultsText ? `Use the following web search results to answer the question: ${searchResultsText}` : 'No specific web results found.'}` }]
+                            });
+
+                            // Final call to Gemini with augmented history
+                            try {
+                                const payload = { contents: chatHistoryForGemini };
+                                const apiKey = ""; // Canvas will provide this at runtime
+                                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                                const fetchResponse = await fetch(apiUrl, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(payload)
+                                });
+
+                                const result = await fetchResponse.json();
+
+                                if (result.candidates && result.candidates.length > 0 &&
+                                    result.candidates[0].content && result.candidates[0].content.parts &&
+                                    result.candidates[0].content.parts.length > 0) {
+                                    aiResponseText = result.candidates[0].content.parts[0].text;
+                                } else {
+                                    aiResponseText = "I'm sorry, I couldn't find a relevant answer. Could you please rephrase or ask something else?";
+                                    showAlert("No relevant answer found.", "warning");
+                                }
+                            } catch (apiError) {
+                                console.error("Error communicating with Gemini API:", apiError);
+                                aiResponseText = "I'm experiencing some technical difficulties. Please try again later.";
+                                showAlert("API communication error.", "error");
+                            }
+                        }
+                    }
+                }
+
+                setResponse(aiResponseText); // Set the full response for speech and internal use
+                typeResponse(aiResponseText); // Start typing animation for the main display
+                setMessages((prev) => [...prev, { type: 'jarvis', text: aiResponseText, timestamp: new Date() }]); // Add to chat log
+                setLastJarvisResponse(aiResponseText); // Store for potential training
+                speak(aiResponseText); // Speak the full response immediately
+                setLoading(false);
+                showAlert("Command processed.", "success");
+            };
+
+            // Handle text input submission
+            const handleTextSubmit = (event) => {
+                event.preventDefault();
+                if (input.trim()) {
+                    processCommand(input);
+                    setInput('');
+                }
+            };
+
+            // Function to open the training modal
+            const openTrainingModal = () => {
+                setCorrectedResponse(lastJarvisResponse); // Pre-fill with J.A.R.V.I.S.'s last response
+                setShowTrainingModal(true);
+            };
+
+            // Function to close the training modal
+            const closeTrainingModal = () => {
+                setShowTrainingModal(false);
+                setCorrectedResponse('');
+            };
+
+            // Handle saving the corrected response
+            const handleSaveCorrection = () => {
+                if (lastUserInput && correctedResponse.trim()) {
+                    saveTrainingRecord(lastUserInput, correctedResponse.trim());
+                } else {
+                    setResponse("Cannot save training: missing user input or corrected response.");
+                    speak("Cannot save training: missing user input or corrected response.");
+                    showAlert("Cannot save training: missing input.", "warning");
+                    closeTrainingModal();
+                }
+            };
+
+            // Function to stop all ongoing operations
+            const stopAllOperations = () => {
+                if (recognitionRef.current && listening) {
+                    recognitionRef.current.stop();
+                    setListening(false);
+                }
+                if (window.speechSynthesis && speaking) {
+                    window.speechSynthesis.cancel();
+                    setSpeaking(false);
+                }
+                if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                }
+                setLoading(false);
+                setResponse("Operation stopped.");
+                setDisplayedResponse("Operation stopped.");
+                showAlert("All operations stopped.", "info");
+                console.log("All J.A.R.V.I.S. operations stopped.");
+            };
+
+            // Handle clearing chat history
+            const clearChatHistory = () => {
+                setMessages([{ type: 'jarvis', text: "Chat history cleared.", timestamp: new Date() }]);
+                setResponse("Chat history cleared.");
+                typeResponse("Chat history cleared.");
+                speak("Chat history cleared.");
+                showAlert("Chat history cleared.", "info");
+                setShowMenuModal(false);
+            };
+
+            // Handle clearing all trained data
+            const confirmClearTrainingData = () => {
+                setShowConfirmClearModal(true);
+            };
+
+            const clearAllTrainingData = async () => {
+                if (!db || !userId) {
+                    console.error("Firestore or User ID not available. Cannot clear training data.");
+                    setResponse("Error: Cannot clear training data. Not authenticated.");
+                    speak("Error: Cannot clear training data. Not authenticated.");
+                    showAlert("Error: Not authenticated to clear data.", "error");
+                    setShowConfirmClearModal(false);
+                    return;
+                }
+
+                setLoading(true);
+                try {
+                    const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+                    const trainingCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/jarvis_training`);
+                    const q = query(trainingCollectionRef);
+                    const querySnapshot = await getDocs(q);
+
+                    const deletePromises = [];
+                    querySnapshot.forEach((docItem) => {
+                        deletePromises.push(deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/jarvis_training`, docItem.id)));
+                    });
+
+                    await Promise.all(deletePromises);
+                    setTrainingData([]); // Clear local state
+                    setResponse("All trained data cleared successfully!");
+                    speak("All trained data cleared successfully!");
+                    showAlert("All trained data cleared.", "success");
+                    console.log("All trained data cleared.");
+                } catch (error) {
+                    console.error("Error clearing training data:", error);
+                    setResponse("Error clearing trained data.");
+                    speak("Error clearing trained data.");
+                    showAlert("Error clearing trained data.", "error");
+                } finally {
+                    setLoading(false);
+                    setShowConfirmClearModal(false);
+                    setShowMenuModal(false);
+                }
+            };
+
+            // LLM Feature: Summarize Chat
+            const handleSummarizeChat = async () => {
+                setLoading(true);
+                setResponse("Summarizing chat history...");
+                typeResponse("Summarizing chat history...");
+                showAlert("Summarizing chat...", "info");
+
+                const conversationText = messages.map(msg => `${msg.type === 'user' ? 'User' : 'J.A.R.V.I.S.'}: ${msg.text}`).join('\n');
+                const prompt = `Please summarize the following conversation concisely:\n\n${conversationText}`;
+
+                try {
+                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                    const apiKey = ""; // Canvas will provide this at runtime
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const fetchResponse = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await fetchResponse.json();
+
+                    let summary = "I couldn't generate a summary at this moment.";
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        summary = result.candidates[0].content.parts[0].text;
+                    }
+                    setResponse(`Summary: ${summary}`);
+                    typeResponse(`Summary: ${summary}`);
+                    setMessages((prev) => [...prev, { type: 'jarvis', text: `Summary: ${summary}`, timestamp: new Date() }]);
+                    speak(`Summary: ${summary}`);
+                    showAlert("Chat summarized.", "success");
+                } catch (error) {
+                    console.error("Error summarizing chat:", error);
+                    setResponse("Error summarizing chat. Please try again.");
+                    typeResponse("Error summarizing chat. Please try again.");
+                    setMessages((prev) => [...prev, { type: 'jarvis', text: "Error summarizing chat. Please try again.", timestamp: new Date() }]);
+                    speak("Error summarizing chat. Please try again.");
+                    showAlert("Error summarizing chat.", "error");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // LLM Feature: Brainstorm Idea
+            const handleBrainstormIdea = () => {
+                setShowBrainstormModal(true);
+            };
+
+            const handleGenerateBrainstorm = async () => {
+                if (!brainstormTopic.trim()) {
+                    setResponse("Please enter a topic for brainstorming.");
+                    typeResponse("Please enter a topic for brainstorming.");
+                    speak("Please enter a topic for brainstorming.");
+                    showAlert("Please enter a topic.", "warning");
+                    return;
+                }
+
+                setShowBrainstormModal(false);
+                setLoading(true);
+                setResponse(`Brainstorming ideas for "${brainstormTopic}"...`);
+                typeResponse(`Brainstorming ideas for "${brainstormTopic}"...`);
+                showAlert("Generating brainstorm ideas...", "info");
+
+                const prompt = `Brainstorm a list of creative and diverse ideas for the topic: "${brainstormTopic}". Provide at least 5 distinct ideas, each with a brief description.`;
+
+                try {
+                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                    const apiKey = ""; // Canvas will provide this at runtime
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const fetchResponse = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await fetchResponse.json();
+
+                    let ideas = "I couldn't generate ideas for that topic at this moment.";
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        ideas = result.candidates[0].content.parts[0].text;
+                    }
+                    setResponse(`Here are some ideas for "${brainstormTopic}":\n${ideas}`);
+                    typeResponse(`Here are some ideas for "${brainstormTopic}":\n${ideas}`);
+                    setMessages((prev) => [...prev, { type: 'jarvis', text: `Ideas for "${brainstormTopic}":\n${ideas}`, timestamp: new Date() }]);
+                    speak(`Here are some ideas for ${brainstormTopic}.`);
+                    showAlert("Ideas generated.", "success");
+                } catch (error) {
+                    console.error("Error brainstorming idea:", error);
+                    setResponse("Error brainstorming. Please try again.");
+                    typeResponse("Error brainstorming. Please try again.");
+                    setMessages((prev) => [...prev, { type: 'jarvis', text: "Error brainstorming. Please try again.", timestamp: new Date() }]);
+                    speak("Error brainstorming. Please try again.");
+                    showAlert("Error brainstorming.", "error");
+                } finally {
+                    setLoading(false);
+                    setBrainstormTopic(''); // Clear topic after generating
+                }
+            };
+
+            // New LLM Feature: Handle Quiz Question
+            const handleAskQuiz = () => {
+                setShowQuizModal(true);
+                setQuizQuestion(''); // Clear previous question
+                setQuizFormat('text'); // Default to text format
+            };
+
+            const handleSendQuizQuestion = async () => {
+                if (!quizQuestion.trim()) {
+                    setResponse("Please enter a quiz question.");
+                    typeResponse("Please enter a quiz question.");
+                    speak("Please enter a quiz question.");
+                    showAlert("Please enter a quiz question.", "warning");
+                    return;
+                }
+
+                setShowQuizModal(false);
+                setLoading(true);
+                setResponse(`Answering your quiz question in ${quizFormat} format...`);
+                typeResponse(`Answering your quiz question in ${quizFormat} format...`);
+                showAlert("Answering quiz question...", "info");
+
+                let prompt;
+                if (quizFormat === 'code') {
+                    prompt = `Provide the code for the following concept/problem. Enclose the code in a markdown code block, specifying the language. Question: "${quizQuestion}"`;
+                } else { // 'text' or default
+                    prompt = `Answer the following quiz question. Provide a concise and clear explanation. Question: "${quizQuestion}"`;
+                }
+
+                try {
+                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                    const apiKey = ""; // Canvas will provide this at runtime
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const fetchResponse = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await fetchResponse.json();
+
+                    let answer = "I couldn't answer that quiz question at this moment.";
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        answer = result.candidates[0].content.parts[0].text;
+                    }
+
+                    // Add quiz question and answer to messages with a specific type for styling
+                    setMessages((prev) => [
+                        ...prev,
+                        { type: 'user', text: `Quiz Question: ${quizQuestion}`, timestamp: new Date() },
+                        { type: 'quiz-answer', text: `Answer (${quizFormat}):\n${answer}`, timestamp: new Date() }
+                    ]);
+                    speak(`Here is the answer to your quiz question: ${answer}`);
+                    showAlert("Quiz answer generated.", "success");
+                } catch (error) {
+                    console.error("Error answering quiz question:", error);
+                    const errorMessage = "Error answering quiz question. Please try again.";
+                    setMessages((prev) => [...prev, { type: 'jarvis', text: errorMessage, timestamp: new Date() }]);
+                    speak(errorMessage);
+                    showAlert("Error answering quiz question.", "error");
+                } finally {
+                    setLoading(false);
+                    setQuizQuestion(''); // Clear input
+                }
+            };
+
+            // New LLM Feature: Creative Writing
+            const handleCreativeWriting = (type = 'story') => {
+                setCreativeWritingType(type);
+                setShowCreativeWritingModal(true);
+                setCreativeWritingTopic(''); // Clear previous topic
+            };
+
+            const handleGenerateCreativeContent = async () => {
+                if (!creativeWritingTopic.trim()) {
+                    setResponse("Please enter a topic for your creative writing.");
+                    typeResponse("Please enter a topic for your creative writing.");
+                    speak("Please enter a topic for your creative writing.");
+                    showAlert("Please enter a topic.", "warning");
+                    return;
+                }
+
+                setShowCreativeWritingModal(false);
+                setLoading(true);
+                setResponse(`Generating a ${creativeWritingType} about "${creativeWritingTopic}"...`);
+                typeResponse(`Generating a ${creativeWritingType} about "${creativeWritingTopic}"...`);
+                showAlert(`Generating ${creativeWritingType}...`, "info");
+
+                const prompt = `Write a short ${creativeWritingType} about "${creativeWritingTopic}". Make it engaging and concise.`;
+
+                try {
+                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                    const apiKey = ""; // Canvas will provide this at runtime
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const fetchResponse = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await fetchResponse.json();
+
+                    let content = "I couldn't generate creative content at this moment.";
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        content = result.candidates[0].content.parts[0].text;
+                    }
+                    setResponse(`Here is your ${creativeWritingType} about "${creativeWritingTopic}":\n${content}`);
+                    typeResponse(`Here is your ${creativeWritingType} about "${creativeWritingTopic}":\n${content}`);
+                    setMessages((prev) => [...prev, { type: 'creative-content', text: `Generated ${creativeWritingType} about "${creativeWritingTopic}":\n${content}`, timestamp: new Date() }]);
+                    speak(`Here is your ${creativeWritingType}.`);
+                    showAlert("Creative content generated.", "success");
+                } catch (error) {
+                    console.error("Error generating creative content:", error);
+                    setResponse("Error generating creative content. Please try again.");
+                    typeResponse("Error generating creative content. Please try again.");
+                    setMessages((prev) => [...prev, { type: 'jarvis', text: "Error generating creative content. Please try again.", timestamp: new Date() }]);
+                    speak("Error generating creative content. Please try again.");
+                    showAlert("Error generating creative content.", "error");
+                } finally {
+                    setLoading(false);
+                    setCreativeWritingTopic('');
+                }
+            };
+
+            // New LLM Feature: Code Generation
+            const handleCodeGeneration = () => {
+                setShowCodeGenerationModal(true);
+                setCodeGenerationPrompt('');
+                setCodeLanguage('javascript'); // Default language
+            };
+
+            const handleGenerateCode = async () => {
+                if (!codeGenerationPrompt.trim()) {
+                    setResponse("Please enter a prompt for code generation.");
+                    typeResponse("Please enter a prompt for code generation.");
+                    speak("Please enter a prompt for code generation.");
+                    showAlert("Please enter a code prompt.", "warning");
+                    return;
+                }
+
+                setShowCodeGenerationModal(false);
+                setLoading(true);
+                setResponse(`Generating ${codeLanguage} code for your request...`);
+                typeResponse(`Generating ${codeLanguage} code for your request...`);
+                showAlert(`Generating ${codeLanguage} code...`, "info");
+
+                const prompt = `Generate a code snippet in ${codeLanguage} for the following request: "${codeGenerationPrompt}". Enclose the code in a markdown code block, specifying the language.`;
+
+                try {
+                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                    const apiKey = ""; // Canvas will provide this at runtime
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const fetchResponse = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await fetchResponse.json();
+
+                    let code = "I couldn't generate code for that request at this moment.";
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        code = result.candidates[0].content.parts[0].text;
+                    }
+                    setResponse(`Here is the ${codeLanguage} code:\n${code}`);
+                    typeResponse(`Here is the ${codeLanguage} code:\n${code}`);
+                    setMessages((prev) => [...prev, { type: 'code-output', text: `Generated ${codeLanguage} code:\n${code}`, timestamp: new Date() }]);
+                    speak(`Here is your ${codeLanguage} code.`);
+                    showAlert("Code generated.", "success");
+                } catch (error) {
+                    console.error("Error generating code:", error);
+                    setResponse("Error generating code. Please try again.");
+                    typeResponse("Error generating code. Please try again.");
+                    setMessages((prev) => [...prev, { type: 'jarvis', text: "Error generating code. Please try again.", timestamp: new Date() }]);
+                    speak("Error generating code. Please try again.");
+                    showAlert("Error generating code.", "error");
+                } finally {
+                    setLoading(false);
+                    setCodeGenerationPrompt('');
+                }
+            };
+
+            // New LLM Feature: Image Description
+            const handleImageDescription = () => {
+                setShowImageDescriptionModal(true);
+                setImageFile(null);
+                setImagePreviewUrl(null);
+                setImageDescriptionPrompt('');
+            };
+
+            const handleImageFileChange = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    setImageFile(file);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setImagePreviewUrl(reader.result);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    setImageFile(null);
+                    setImagePreviewUrl(null);
+                }
+            };
+
+            const handleAnalyzeImage = async () => {
+                if (!imageFile) {
+                    setResponse("Please select an image to describe.");
+                    typeResponse("Please select an image to describe.");
+                    speak("Please select an image to describe.");
+                    showAlert("Please select an image.", "warning");
+                    return;
+                }
+
+                setShowImageDescriptionModal(false);
+                setLoading(true);
+                setResponse("Analyzing image...");
+                typeResponse("Analyzing image...");
+                showAlert("Analyzing image...", "info");
+
+                const reader = new FileReader();
+                reader.readAsDataURL(imageFile);
+                reader.onloadend = async () => {
+                    const base64ImageData = reader.result.split(',')[1]; // Get base64 part
+
+                    try {
+                        const promptText = imageDescriptionPrompt.trim() || "Describe this image.";
+                        const payload = {
+                            contents: [
+                                {
+                                    role: "user",
+                                    parts: [
+                                        { text: promptText },
+                                        {
+                                            inlineData: {
+                                                mimeType: imageFile.type,
+                                                data: base64ImageData
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                        };
+                        const apiKey = "";
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                        const fetchResponse = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const result = await fetchResponse.json();
+
+                        let description = "I couldn't describe the image at this moment.";
+                        if (result.candidates && result.candidates.length > 0 &&
+                            result.candidates[0].content && result.candidates[0].content.parts &&
+                            result.candidates[0].content.parts.length > 0) {
+                            description = result.candidates[0].content.parts[0].text;
+                        }
+
+                        setResponse(`Image Analysis: ${description}`);
+                        typeResponse(`Image Analysis: ${description}`);
+                        setMessages((prev) => [
+                            ...prev,
+                            { type: 'user', text: `Image Analysis Request: ${promptText}`, timestamp: new Date() },
+                            { type: 'image-description', text: `Image Description:\n${description}`, imageUrl: imagePreviewUrl, timestamp: new Date() }
+                        ]);
+                        speak(`Image analysis complete: ${description}`);
+                        showAlert("Image analyzed.", "success");
+                    } catch (error) {
+                        console.error("Error analyzing image:", error);
+                        setResponse("Error analyzing image. Please try again.");
+                        typeResponse("Error analyzing image. Please try again.");
+                        setMessages((prev) => [...prev, { type: 'jarvis', text: "Error analyzing image. Please try again.", timestamp: new Date() }]);
+                        speak("Error analyzing image. Please try again.");
+                        showAlert("Error analyzing image.", "error");
+                    } finally {
+                        setLoading(false);
+                        setImageFile(null);
+                        setImagePreviewUrl(null);
+                        setImageDescriptionPrompt('');
+                    }
+                };
+            };
+
+            // New LLM Feature: Image Generation
+            const handleImageGeneration = () => {
+                setShowImageGenerationModal(true);
+                setImageGenerationPrompt('');
+                setGeneratedImageUrl(null);
+            };
+
+            const handleGenerateImage = async () => {
+                if (!imageGenerationPrompt.trim()) {
+                    setResponse("Please enter a prompt for image generation.");
+                    typeResponse("Please enter a prompt for image generation.");
+                    speak("Please enter a prompt for image generation.");
+                    showAlert("Please enter an image prompt.", "warning");
+                    return;
+                }
+
+                setShowImageGenerationModal(false);
+                setIsImageGenerating(true);
+                setLoading(true);
+                setResponse("Generating image...");
+                typeResponse("Generating image...");
+                showAlert("Generating image...", "info");
+
+                try {
+                    const payload = { instances: { prompt: imageGenerationPrompt }, parameters: { "sampleCount": 1 } };
+                    const apiKey = "";
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+
+                    const fetchResponse = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await fetchResponse.json();
+
+                    if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                        const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        setGeneratedImageUrl(imageUrl);
+                        setResponse("Image generated successfully!");
+                        typeResponse("Image generated successfully!");
+                        setMessages((prev) => [
+                            ...prev,
+                            { type: 'user', text: `Image Generation Request: "${imageGenerationPrompt}"`, timestamp: new Date() },
+                            { type: 'generated-image', text: "Generated Image:", imageUrl: imageUrl, timestamp: new Date() }
+                        ]);
+                        speak("Image generated.");
+                        showAlert("Image generated.", "success");
+                    } else {
+                        setResponse("Failed to generate image. Please try a different prompt.");
+                        typeResponse("Failed to generate image. Please try a different prompt.");
+                        speak("Failed to generate image.");
+                        showAlert("Image generation failed.", "error");
+                    }
+                } catch (error) {
+                    console.error("Error generating image:", error);
+                    setResponse("Error generating image. Please try again.");
+                    typeResponse("Error generating image. Please try again.");
+                    speak("Error generating image.");
+                    showAlert("Error generating image.", "error");
+                } finally {
+                    setIsImageGenerating(false);
+                    setLoading(false);
+                    setImageGenerationPrompt('');
+                }
+            };
+
+
+            // System Map Drawing Logic
+            useEffect(() => {
+                const canvas = systemMapCanvasRef.current;
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d');
+                let animationFrameId;
+
+                const resizeCanvas = () => {
+                    const parent = canvas.parentElement;
+                    canvas.width = parent.clientWidth;
+                    canvas.height = parent.clientHeight;
+                    drawSystemMap();
+                };
+
+                const drawSystemMap = () => {
+                    if (!ctx) return;
+
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+
+                    // Clear canvas
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Background (darker for robotic theme)
+                    ctx.fillStyle = mode === 'robotic' ? 'rgba(20, 0, 0, 0.8)' : 'rgba(10, 10, 20, 0.8)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw connections
+                    systemConnections.forEach(conn => {
+                        const fromNode = systemNodes.find(node => node.id === conn.from);
+                        const toNode = systemNodes.find(node => node.id === conn.to);
+
+                        if (fromNode && toNode) {
+                            ctx.beginPath();
+                            ctx.moveTo(fromNode.x * canvas.width, fromNode.y * canvas.height);
+                            ctx.lineTo(toNode.x * canvas.width, toNode.y * canvas.height);
+                            ctx.strokeStyle = mode === 'robotic' ? 'rgba(255, 0, 0, 0.3)' : 'rgba(59, 130, 246, 0.3)';
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+                    });
+
+                    // Draw data flow particles
+                    dataFlowParticles.forEach(particle => {
+                        const fromNode = systemNodes.find(node => node.id === particle.fromNodeId);
+                        const toNode = systemNodes.find(node => node.id === particle.toNodeId);
+
+                        if (fromNode && toNode) {
+                            const currentX = fromNode.x * canvas.width + (toNode.x * canvas.width - fromNode.x * canvas.width) * particle.progress;
+                            const currentY = fromNode.y * canvas.height + (toNode.y * canvas.height - fromNode.y * canvas.height) * particle.progress;
+
+                            ctx.beginPath();
+                            ctx.arc(currentX, currentY, 3, 0, Math.PI * 2);
+                            ctx.fillStyle = particle.color;
+                            ctx.fill();
+                        }
+                    });
+
+                    // Draw nodes
+                    systemNodes.forEach(node => {
+                        const x = node.x * canvas.width;
+                        const y = node.y * canvas.height;
+
+                        // Node background
+                        ctx.beginPath();
+                        ctx.arc(x, y, node.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = mode === 'robotic' ? 'rgba(255, 0, 0, 0.5)' : 'rgba(59, 130, 246, 0.5)';
+                        ctx.fill();
+
+                        // Node border and glow based on status
+                        ctx.strokeStyle = mode === 'robotic' ? 'rgba(255, 0, 0, 0.8)' : 'rgba(59, 130, 246, 0.8)';
+                        ctx.lineWidth = 2;
+                        if (node.status === 'active') {
+                            ctx.strokeStyle = mode === 'robotic' ? 'yellow' : 'cyan';
+                            ctx.shadowColor = mode === 'robotic' ? 'yellow' : 'cyan';
+                            ctx.shadowBlur = 10;
+                        } else if (node.status === 'warning') {
+                            ctx.strokeStyle = 'orange';
+                            ctx.shadowColor = 'orange';
+                            ctx.shadowBlur = 10;
+                        } else {
+                            ctx.shadowBlur = 0;
+                        }
+                        ctx.stroke();
+
+                        // Node text (ID/Name)
+                        ctx.fillStyle = 'white';
+                        ctx.font = '10px Inter';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(node.name, x, y);
+                    });
+                };
+
+                const animateSystemMap = () => {
+                    drawSystemMap();
+                    systemMapAnimationRef.current = requestAnimationFrame(animateSystemMap);
+                };
+
+                // Initial setup
+                resizeCanvas(); // Set initial size
+                window.addEventListener('resize', resizeCanvas);
+                systemMapAnimationRef.current = requestAnimationFrame(animateSystemMap); // Start animation
+
+                // Cleanup
+                return () => {
+                    window.removeEventListener('resize', resizeCanvas);
+                    cancelAnimationFrame(systemMapAnimationRef.current);
+                };
+            }, [systemNodes, systemConnections, dataFlowParticles, mode]); // Redraw when these states change
+
+
+            // Conditional classes for mode and theme
+            const getThemeClasses = (element) => {
+                const base = {
+                    containerBg: 'from-gray-900 to-black',
+                    mainBoxBg: 'bg-gray-800 bg-opacity-70',
+                    accentColor: 'text-blue-400',
+                    accentBorder: 'border-blue-500',
+                    accentShadow: 'shadow-blue-500/30',
+                    accentBg: 'bg-blue-600',
+                    buttonBg: 'bg-blue-600 hover:bg-blue-700',
+                    sendButtonBg: 'bg-green-600 hover:bg-green-700',
+                    trainButtonBg: 'bg-purple-600 hover:bg-purple-700',
+                    userMessageBg: 'bg-blue-700',
+                    jarvisMessageBg: 'bg-gray-700',
+                    pulseColor: 'bg-white',
+                    radialGradient: 'bg-radial-gradient-classic',
+                    alertInfoBg: 'bg-blue-500',
+                    alertWarningBg: 'bg-yellow-500',
+                    alertErrorBg: 'bg-red-500',
+                    alertSuccessBg: 'bg-green-500',
+                };
+
+                const robotic = {
+                    accentColor: 'text-red-400',
+                    accentBorder: 'border-red-500',
+                    accentShadow: 'shadow-red-500/30',
+                    accentBg: 'bg-red-600',
+                    buttonBg: 'bg-red-600 hover:bg-red-700',
+                    sendButtonBg: 'bg-cyan-600 hover:bg-cyan-700',
+                    trainButtonBg: 'bg-orange-600 hover:bg-orange-700',
+                    userMessageBg: 'bg-red-700',
+                    pulseColor: 'bg-red-300',
+                    radialGradient: 'bg-radial-gradient-robotic',
+                    alertInfoBg: 'bg-cyan-500',
+                    alertWarningBg: 'bg-orange-500',
+                    alertErrorBg: 'bg-red-600',
+                    alertSuccessBg: 'bg-lime-500',
+                };
+
+                const darker = {
+                    containerBg: 'from-black to-gray-950',
+                    mainBoxBg: 'bg-gray-900 bg-opacity-80',
+                    accentColor: 'text-teal-400',
+                    accentBorder: 'border-teal-600',
+                    accentShadow: 'shadow-teal-500/30',
+                    accentBg: 'bg-teal-700',
+                    buttonBg: 'bg-teal-600 hover:bg-teal-700',
+                    sendButtonBg: 'bg-emerald-600 hover:bg-emerald-700',
+                    trainButtonBg: 'bg-indigo-600 hover:bg-indigo-700',
+                    userMessageBg: 'bg-teal-800',
+                    jarvisMessageBg: 'bg-gray-800',
+                    pulseColor: 'bg-teal-200',
+                    radialGradient: 'bg-radial-gradient-darker',
+                    alertInfoBg: 'bg-blue-700',
+                    alertWarningBg: 'bg-yellow-700',
+                    alertErrorBg: 'bg-red-700',
+                    alertSuccessBg: 'bg-green-700',
+                };
+
+                const futuristic = {
+                    containerBg: 'from-purple-950 to-indigo-950',
+                    mainBoxBg: 'bg-purple-900 bg-opacity-70',
+                    accentColor: 'text-fuchsia-400',
+                    accentBorder: 'border-fuchsia-600',
+                    accentShadow: 'shadow-fuchsia-500/30',
+                    accentBg: 'bg-fuchsia-700',
+                    buttonBg: 'bg-violet-600 hover:bg-violet-700',
+                    sendButtonBg: 'bg-pink-600 hover:bg-pink-700',
+                    trainButtonBg: 'bg-blue-600 hover:bg-blue-700',
+                    userMessageBg: 'bg-violet-800',
+                    jarvisMessageBg: 'bg-purple-800',
+                    pulseColor: 'bg-fuchsia-200',
+                    radialGradient: 'bg-radial-gradient-futuristic',
+                    alertInfoBg: 'bg-violet-500',
+                    alertWarningBg: 'bg-orange-500',
+                    alertErrorBg: 'bg-red-500',
+                    alertSuccessBg: 'bg-emerald-500',
+                };
+
+                let currentTheme = { ...base };
+
+                if (selectedTheme === 'darker') {
+                    currentTheme = { ...currentTheme, ...darker };
+                } else if (selectedTheme === 'futuristic') {
+                    currentTheme = { ...currentTheme, ...futuristic };
+                }
+
+                if (mode === 'robotic') {
+                    currentTheme = { ...currentTheme, ...robotic };
+                    if (selectedTheme === 'darker') { // Robotic + Darker
+                        currentTheme.containerBg = 'from-black to-red-950';
+                        currentTheme.mainBoxBg = 'bg-red-900 bg-opacity-80';
+                    } else if (selectedTheme === 'futuristic') { // Robotic + Futuristic
+                        currentTheme.containerBg = 'from-red-950 to-purple-950';
+                        currentTheme.mainBoxBg = 'bg-red-900 bg-opacity-70';
+                    }
+                }
+
+                switch (element) {
+                    case 'containerBg': return currentTheme.containerBg;
+                    case 'mainBoxBg': return currentTheme.mainBoxBg;
+                    case 'accentColor': return currentTheme.accentColor;
+                    case 'accentBorder': return currentTheme.accentBorder;
+                    case 'accentShadow': return currentTheme.accentShadow;
+                    case 'accentBg': return currentTheme.accentBg;
+                    case 'buttonBg': return currentTheme.buttonBg;
+                    case 'sendButtonBg': return currentTheme.sendButtonBg;
+                    case 'trainButtonBg': return currentTheme.trainButtonBg;
+                    case 'userMessageBg': return currentTheme.userMessageBg;
+                    case 'jarvisMessageBg': return currentTheme.jarvisMessageBg;
+                    case 'pulseColor': return currentTheme.pulseColor;
+                    case 'radialGradient': return currentTheme.radialGradient;
+                    case 'alertInfoBg': return currentTheme.alertInfoBg;
+                    case 'alertWarningBg': return currentTheme.alertWarningBg;
+                    case 'alertErrorBg': return currentTheme.alertErrorBg;
+                    case 'alertSuccessBg': return currentTheme.alertSuccessBg;
+                    default: return '';
+                }
+            };
+
+            // Component for a generic GUI panel with a glowing border
+            const GuiPanel = ({ title, children, className = '' }) => (
+                <div className={`relative p-4 rounded-xl bg-gray-900 bg-opacity-40 backdrop-blur-sm border ${getThemeClasses('accentBorder')} ${getThemeClasses('accentShadow')} overflow-hidden ${className} gui-panel`}>
+                    <div className="absolute inset-0 border-animated"></div> {/* Animated border */}
+                    <h3 className={`text-lg font-semibold mb-3 ${getThemeClasses('accentColor')} text-center`}>{title}</h3>
+                    {children}
+                    <div className="scan-line"></div> {/* Scanning line effect */}
+                </div>
+            );
+
+            // Component for a data point with a label and value
+            const DataPoint = ({ label, value, unit, colorClass = getThemeClasses('accentColor') }) => (
+                <div className="flex justify-between items-center text-sm mb-1">
+                    <span className="text-gray-400">{label}:</span>
+                    <span className={`font-mono ${colorClass}`}>{value}{unit}</span>
+                </div>
+            );
+
+            // Component for a dismissible alert
+            const NotificationAlert = ({ message, type, onClose }) => {
+                let bgColorClass = '';
+                switch (type) {
+                    case 'info': bgColorClass = getThemeClasses('alertInfoBg'); break;
+                    case 'warning': bgColorClass = getThemeClasses('alertWarningBg'); break;
+                    case 'error': bgColorClass = getThemeClasses('alertErrorBg'); break;
+                    case 'success': bgColorClass = getThemeClasses('alertSuccessBg'); break;
+                    default: bgColorClass = getThemeClasses('alertInfoBg');
+                }
+
+                return (
+                    <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-lg shadow-xl text-white flex items-center justify-between gap-4 transition-all duration-300 ease-out ${bgColorClass} alert-enter alert-enter-active`}>
+                        <span>{message}</span>
+                        <button onClick={onClose} className="text-white opacity-70 hover:opacity-100 transition-opacity duration-200">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                );
+            };
+
+
+            return (
+                <div className={`min-h-screen bg-gradient-to-br ${getThemeClasses('containerBg')} text-gray-100 font-inter flex flex-col items-center justify-center p-4 overflow-hidden relative`}>
+                    {/* Notification Alert */}
+                    {currentAlert && (
+                        <NotificationAlert
+                            message={currentAlert.message}
+                            type={currentAlert.type}
+                            onClose={() => setCurrentAlert(null)}
+                        />
+                    )}
+
+                    {/* Background Grid/Pattern */}
+                    <div className="absolute inset-0 z-0 opacity-10" style={{
+                        backgroundImage: 'linear-gradient(to right, #333 1px, transparent 1px), linear-gradient(to bottom, #333 1px, transparent 1px)',
+                        backgroundSize: '20px 20px'
+                    }}></div>
+                    <div className={`absolute inset-0 z-0 ${getThemeClasses('radialGradient')} opacity-20`}></div>
+
+                    {/* Mode Selection Buttons */}
+                    <div className="absolute top-4 left-4 flex gap-2 z-20">
+                        <button
+                            onClick={() => { setMode('classic'); /* Reset theme specific settings if desired */ }}
+                            className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${mode === 'classic' ? getThemeClasses('accentBg') + ' text-white shadow-lg' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+                        >
+                            Classic Mode
+                        </button>
+                        <button
+                            onClick={() => { setMode('robotic'); /* Reset theme specific settings if desired */ }}
+                            className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${mode === 'robotic' ? getThemeClasses('accentBg') + ' text-white shadow-lg' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+                        >
+                            Robotic Mode
+                        </button>
+                    </div>
+
+                    {/* Top Right Controls: User ID, Stop, Menu */}
+                    <div className="absolute top-4 right-4 flex gap-2 z-20">
+                        {userId && (
+                            <div className="text-xs text-gray-400 bg-gray-700 px-3 py-1 rounded-full border border-gray-600 flex items-center">
+                                User ID: {userId}
+                            </div>
+                        )}
+                        <button
+                            onClick={stopAllOperations}
+                            className="p-2 rounded-full bg-red-700 text-white hover:bg-red-800 transition-all duration-200 active:scale-95 shadow-lg"
+                            title="Stop All Operations"
+                        >
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={() => setShowMenuModal(true)}
+                            className="p-2 rounded-full bg-gray-700 text-white hover:bg-gray-600 transition-all duration-200 active:scale-95 shadow-lg"
+                            title="Menu"
+                        >
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Main GUI Grid Layout */}
+                    <div className="relative z-10 w-full max-w-6xl h-[90vh] grid grid-cols-1 md:grid-cols-3 grid-rows-[auto_1fr_auto] md:grid-rows-[1fr_1fr_auto] gap-6 p-6">
+
+                        {/* Left Column - System Status & Analysis */}
+                        <div className="col-span-1 flex flex-col gap-6">
+                            <GuiPanel title="System Status" className="flex-1">
+                                <DataPoint label="CPU Usage" value={cpuUsage} unit="%" colorClass={cpuUsage > 70 ? 'text-red-500' : getThemeClasses('accentColor')} />
+                                <h4 className="text-sm text-gray-400 mt-2">CPU Cores:</h4>
+                                <div className="grid grid-cols-2 gap-1 mb-2">
+                                    {cpuCoresUsage.map((usage, index) => (
+                                        <div key={index} className="flex items-center text-xs text-gray-300">
+                                            Core {index + 1}: <div className="ml-1 w-10 h-2 bg-gray-700 rounded-full"><div className={`h-full rounded-full ${mode === 'classic' ? 'bg-blue-500' : 'bg-red-500'}`} style={{ width: `${usage}%` }}></div></div> {usage}%</div>
+                                    ))}
+                                </div>
+                                <DataPoint label="GPU Usage" value={gpuUsage} unit="%" colorClass={gpuUsage > 80 ? 'text-red-500' : getThemeClasses('accentColor')} />
+                                <DataPoint label="RAM Used" value={ramUsage} unit="%" colorClass={ramUsage > 85 ? 'text-red-500' : getThemeClasses('accentColor')} />
+                                <DataPoint label="RAM Free" value={ramFree} unit="%" colorClass={ramFree < 15 ? 'text-yellow-500' : getThemeClasses('accentColor')} />
+                                <DataPoint label="Network In" value={networkActivity} unit=" KB/s" />
+                                <DataPoint label="Network Out" value={networkUpload} unit=" KB/s" />
+                                <div className="w-full h-2 bg-gray-700 rounded-full my-2">
+                                    <div className={`h-full rounded-full ${getThemeClasses('accentBg')}`} style={{ width: `${cpuUsage}%` }}></div>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-2">Core processes nominal.</p>
+                            </GuiPanel>
+
+                            <GuiPanel title="Threat Analysis" className="flex-1">
+                                <DataPoint label="Threat Level" value={threatLevel} colorClass={threatLevel === 'Elevated' ? 'text-red-500 animate-pulse' : 'text-green-500'} />
+                                <DataPoint label="Anomalies Detected" value={anomalyCount} />
+                                <p className="text-xs text-gray-400 mt-2">Monitoring external vectors.</p>
+                                {threatLevel === 'Elevated' && (
+                                    <div className={`text-red-400 text-sm mt-1 animate-shimmer`}>
+                                        <svg className="w-5 h-5 inline-block mr-1 align-middle fill-current" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM10 13a1 1 0 100-2 1 1 0 000 2zm-3-8a1 1 0 100-2 1 1 0 000 2zm6 0a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                                        </svg>
+                                        ALERT: Potential threat detected!
+                                    </div>
+                                )}
+                            </GuiPanel>
+
+                            {/* Replaced Radar Graph with System Map */}
+                            <GuiPanel title="System Topology" className="flex-1">
+                                <div className="relative w-full h-48 flex items-center justify-center">
+                                    <canvas ref={systemMapCanvasRef} className="system-map-canvas w-full h-full"></canvas>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-2 text-center">Interconnected system nodes.</p>
+                            </GuiPanel>
+                        </div>
+
+                        {/* Center Column - J.A.R.V.I.S. Core & Communication */}
+                        <div className="col-span-1 flex flex-col items-center justify-between gap-6">
+                            {/* J.A.R.V.I.S. Logo/Indicator */}
+                            <div className="relative w-40 h-40 flex items-center justify-center">
+                                <div className={`absolute inset-0 rounded-full border-4 ${listening ? 'border-green-500 animate-pulse-light-green' : speaking ? 'border-blue-500 animate-pulse-light-blue' : (mode === 'robotic' ? 'border-red-600' : 'border-gray-600')} flex items-center justify-center transition-all duration-300 ease-in-out`}>
+                                    <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${getThemeClasses('accentBg')} shadow-lg flex items-center justify-center relative overflow-hidden transform transition-all duration-300 ${loading ? 'scale-105' : ''}`}>
+                                        {/* Inner pulsating circle for listening/speaking */}
+                                        {(listening || speaking || loading) && (
+                                            <div className={`absolute inset-0 rounded-full ${getThemeClasses('pulseColor')} opacity-20 ${listening ? 'animate-ping-fast' : speaking ? 'animate-pulse-light' : 'animate-spin-slow'}`}></div>
+                                        )}
+                                        {/* Robot Image Icon */}
+                                        <img
+                                            src="https://placehold.co/80x80/333/fff?text=AI"
+                                            alt="Robot Icon"
+                                            className="w-24 h-24 object-cover rounded-full drop-shadow-lg"
+                                            onError={(e) => {
+                                                e.target.onerror = null; // Prevent infinite loop
+                                                e.target.src = "https://placehold.co/80x80/333/fff?text=AI"; // Fallback placeholder
+                                            }}
+                                        />
+                                        {/* Subtle glowing border */}
+                                        <div className={`absolute inset-0 rounded-full border-2 ${listening ? 'border-green-400 glow-green' : speaking ? 'border-blue-400 glow-blue' : 'border-transparent'} transition-all duration-300`}></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Current Response Display (typing effect) */}
+                            <GuiPanel title="J.A.R.V.I.S. Response" className="w-full flex-1 flex flex-col justify-center">
+                                <p className="text-xl text-gray-200 leading-relaxed font-light text-center flex-grow flex items-center justify-center">
+                                    {loading && displayedResponse === "Thinking..." ? (
+                                        <>Thinking<span className="animate-pulse">...</span></>
+                                    ) : (
+                                        displayedResponse
+                                    )}
+                                    {/* Typing cursor */}
+                                    {!loading && !speaking && displayedResponse.length < response.length && (
+                                        <span className="inline-block w-2 h-5 bg-white ml-1 animate-blink"></span>
+                                    )}
+                                </p>
+                                {/* Speech Visualizer */}
+                                {speaking && (
+                                    <div className="w-full flex justify-center items-end h-10 mt-2">
+                                        {[...Array(10)].map((_, i) => (
+                                            <div
+                                                key={i}
+                                                className={`w-2 mx-0.5 rounded-full ${getThemeClasses('accentBg')} transition-all duration-100 ease-in-out transform origin-bottom`}
+                                                style={{ height: `${Math.random() * 80 + 20}%`, animation: `bar-pulse ${Math.random() * 0.5 + 0.5}s infinite alternate` }}
+                                            ></div>
+                                        ))}
+                                    </div>
+                                )}
+                            </GuiPanel>
+
+                            {/* Microphone Button & Input */}
+                            <div className="w-full flex flex-col items-center">
+                                <button
+                                    onClick={startListening}
+                                    className={`relative w-24 h-24 rounded-full flex items-center justify-center text-white text-4xl transition-all duration-300 ease-in-out transform
+                                                ${listening ? 'bg-red-600 scale-110 shadow-red-500/50 animate-glow-red' : `${getThemeClasses('buttonBg')} active:scale-95 shadow-blue-500/50`}
+                                                focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50
+                                                ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={loading}
+                                >
+                                    <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                        <path fillRule="evenodd" d="M7 4a3 3 0 116 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+                                    </svg>
+                                    {listening && (
+                                        <span className="absolute top-0 right-0 -mr-2 -mt-2 w-5 h-5 bg-red-500 rounded-full animate-pulse-fast border-2 border-white"></span>
+                                    )}
+                                </button>
+                                <p className="mt-4 text-sm text-gray-400">Click to speak</p>
+
+                                <form onSubmit={handleTextSubmit} className="w-full mt-6 flex flex-col sm:flex-row gap-4">
+                                    <input
+                                        type="text"
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        placeholder="Type your command here..."
+                                        className="flex-grow p-4 rounded-xl bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-inner"
+                                        disabled={loading || listening}
+                                    />
+                                    <button
+                                        type="submit"
+                                        className={`px-6 py-3 rounded-xl ${getThemeClasses('sendButtonBg')} text-white font-semibold transition-all duration-200 active:scale-95 shadow-lg
+                                                    ${loading || listening ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={loading || listening}
+                                    >
+                                        Send
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        {/* Right Column - Communication Log & Data Streams */}
+                        <div className="col-span-1 flex flex-col gap-6">
+                            <GuiPanel title="Disk Integrity Scan" className="flex-1">
+                                <div className="relative w-full h-24 flex items-center justify-center">
+                                    <div className={`w-20 h-20 rounded-full border-4 ${getThemeClasses('accentBorder')} flex items-center justify-center`}>
+                                        <div className={`absolute w-16 h-16 rounded-full ${getThemeClasses('accentBg')} opacity-20 disk-scan-pulse`}></div>
+                                        <div className={`absolute w-16 h-16 rounded-full border-2 ${getThemeClasses('accentColor')} disk-scan-rotate`} style={{
+                                            clipPath: `polygon(50% 0%, 50% 50%, ${50 + Math.sin(diskScanProgress * Math.PI / 50) * 50}% ${50 - Math.cos(diskScanProgress * Math.PI / 50) * 50}%, 50% 0%)`
+                                        }}></div>
+                                        <span className="text-xl font-bold">{diskScanProgress}%</span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-2 text-center">Scanning sectors for anomalies.</p>
+                                </div>
+                            </GuiPanel>
+
+                            <GuiPanel title="Performance Trend" className="flex-1">
+                                <div className="relative w-full h-24">
+                                    <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                        <polyline
+                                            fill="none"
+                                            stroke={getThemeClasses('accentColor').replace('text-', '#')} // Convert text class to hex color
+                                            strokeWidth="1"
+                                            points={performanceData.map((value, index) => {
+                                                const x = (index / (performanceData.length - 1)) * 100;
+                                                const y = 100 - value; // Invert Y for graph
+                                                return `${x},${y}`;
+                                            }).join(' ')}
+                                        />
+                                        {performanceData.map((value, index) => {
+                                            const x = (index / (performanceData.length - 1)) * 100;
+                                            const y = 100 - value;
+                                            return (
+                                                <circle
+                                                    key={index}
+                                                    cx={x}
+                                                    cy={y}
+                                                    r="1"
+                                                    fill={getThemeClasses('accentColor').replace('text-', '#')}
+                                                    className="graph-dot-pulse"
+                                                />
+                                            );
+                                        })}
+                                    </svg>
+                                    <p className="text-xs text-gray-400 mt-2 text-center">Real-time system load.</p>
+                                </div>
+                            </GuiPanel>
+
+                            <GuiPanel title="Quick Actions" className="flex-1">
+                                <div className="grid grid-cols-2 gap-3 text-center">
+                                    <button
+                                        onClick={() => processCommand("Simulate disk scan")}
+                                        className={`px-3 py-2 rounded-lg ${getThemeClasses('buttonBg')} text-white text-sm font-semibold hover:scale-105 transition-all duration-200`}
+                                    >
+                                        Disk Scan
+                                    </button>
+                                    <button
+                                        onClick={() => processCommand("Check system diagnostics")}
+                                        className={`px-3 py-2 rounded-lg ${getThemeClasses('buttonBg')} text-white text-sm font-semibold hover:scale-105 transition-all duration-200`}
+                                    >
+                                        Diagnostics
+                                    </button>
+                                    <button
+                                        onClick={() => processCommand("Show quick actions")}
+                                        className={`px-3 py-2 rounded-lg ${getThemeClasses('buttonBg')} text-white text-sm font-semibold hover:scale-105 transition-all duration-200`}
+                                    >
+                                        More Actions
+                                    </button>
+                                    <button
+                                        onClick={() => { setResponse("Virtual system reboot initiated. Please wait..."); typeResponse("Virtual system reboot initiated. Please wait..."); speak("Virtual system reboot initiated. Please wait..."); showAlert("Virtual system reboot initiated.", "info"); }}
+                                        className={`px-3 py-2 rounded-lg ${getThemeClasses('buttonBg')} text-white text-sm font-semibold hover:scale-105 transition-all duration-200`}
+                                    >
+                                        Virtual Reboot
+                                    </button>
+                                </div>
+                            </GuiPanel>
+                        </div>
+
+                        {/* Third Row for Local Info & Communication Log */}
+                        <div className="col-span-full md:col-span-3 flex flex-col md:flex-row gap-6 mt-6">
+                            <GuiPanel title="Local Information" className="flex-1">
+                                <div className="mb-2 text-center">
+                                    <h4 className="text-lg font-semibold">Weather in {userLocation ? 'Your Location' : 'Nairobi'}</h4>
+                                    <p className="text-xl">{weatherData.temperature}</p>
+                                    <p className="text-sm text-gray-400">{weatherData.description}</p>
+                                    <p className="text-xs text-gray-500 mt-1">Local Time: {localTime}</p>
+                                    <p className="text-xs text-gray-500">Location Status: {locationStatus}</p>
+                                </div>
+                                {kenyanNews.length > 0 && (
+                                    <div className="mt-4">
+                                        <h4 className="text-md font-semibold mb-2">Trending News (Kenya)</h4>
+                                        <ul className="text-sm text-gray-300 list-disc list-inside">
+                                            {kenyanNews.map((news, index) => (
+                                                <li key={index}><a href={news.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{news.title}</a></li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </GuiPanel>
+
+                            <GuiPanel title="Communication Log" className="flex-1">
+                                <div className="w-full h-full overflow-y-auto custom-scrollbar text-sm">
+                                    {messages.map((msg, index) => (
+                                        <div key={index} className={`mb-3 ${msg.type === 'user' ? 'text-right' : 'text-left'}`}>
+                                            <div className="flex items-start">
+                                                {msg.type === 'jarvis' && (
+                                                    <div className={`w-6 h-6 rounded-full ${getThemeClasses('jarvisMessageBg')} mr-2 flex-shrink-0 flex items-center justify-center text-gray-300 text-xs font-bold`}>
+                                                        J
+                                                    </div>
+                                                )}
+                                                <span className={`inline-block px-3 py-2 rounded-lg max-w-[80%] shadow-sm break-words ${
+                                                    msg.type === 'user' ? getThemeClasses('userMessageBg') :
+                                                    msg.type === 'quiz-answer' || msg.type === 'creative-content' || msg.type === 'code-output' ? 'bg-gray-900 border border-green-500 text-green-300 font-mono text-xs' : // Terminal-like styling for LLM outputs
+                                                    msg.type === 'image-description' ? 'bg-gray-900 border border-purple-500 text-purple-300' :
+                                                    msg.type === 'generated-image' ? 'bg-gray-900 border border-yellow-500' :
+                                                    getThemeClasses('jarvisMessageBg')
+                                                }`}>
+                                                    {msg.text}
+                                                    {msg.imageUrl && (
+                                                        <img src={msg.imageUrl} alt="Generated or Described" className="mt-2 rounded-lg max-w-full h-auto" />
+                                                    )}
+                                                </span>
+                                                {msg.type === 'user' && (
+                                                    <div className={`w-6 h-6 rounded-full ${getThemeClasses('userMessageBg')} ml-2 flex-shrink-0 flex items-center justify-center text-white text-xs font-bold`}>
+                                                        You
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-1 ml-8 text-left">{msg.timestamp.toLocaleTimeString()}</p>
+                                        </div>
+                                    ))}
+                                    <div ref={messagesEndRef} /> {/* Scroll target */}
+                                </div>
+                            </GuiPanel>
+                        </div>
+
+                        {/* Bottom Row - Controls */}
+                        <div className="col-span-full flex justify-center gap-4 mt-6 flex-wrap">
+                            {lastUserInput && lastJarvisResponse && (
+                                <button
+                                    onClick={openTrainingModal}
+                                    className={`px-6 py-3 rounded-xl ${getThemeClasses('trainButtonBg')} text-white font-semibold transition-all duration-200 active:scale-95 shadow-lg`}
+                                    disabled={loading}
+                                >
+                                    Train J.A.R.V.I.S. (Correct Last Response)
+                                </button>
+                            )}
+                            <button
+                                onClick={handleSummarizeChat}
+                                className={`px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-all duration-200 active:scale-95 shadow-lg`}
+                                disabled={loading || messages.length <= 1} // Disable if no significant chat history
+                            >
+                                Summarize Chat ✨
+                            </button>
+                            <button
+                                onClick={handleBrainstormIdea}
+                                className={`px-6 py-3 rounded-xl bg-orange-600 text-white font-semibold hover:bg-orange-700 transition-all duration-200 active:scale-95 shadow-lg`}
+                                disabled={loading}
+                            >
+                                Brainstorm Idea ✨
+                            </button>
+                            <button
+                                onClick={handleAskQuiz}
+                                className={`px-6 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-all duration-200 active:scale-95 shadow-lg`}
+                                disabled={loading}
+                            >
+                                Ask Quiz Question ✨
+                            </button>
+                            <button
+                                onClick={() => handleCreativeWriting('story')}
+                                className={`px-6 py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-700 transition-all duration-200 active:scale-95 shadow-lg`}
+                                disabled={loading}
+                            >
+                                Creative Writing ✨
+                            </button>
+                            <button
+                                onClick={handleCodeGeneration}
+                                className={`px-6 py-3 rounded-xl bg-cyan-600 text-white font-semibold hover:bg-cyan-700 transition-all duration-200 active:scale-95 shadow-lg`}
+                                disabled={loading}
+                            >
+                                Generate Code ✨
+                            </button>
+                            <button
+                                onClick={handleImageDescription}
+                                className={`px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-all duration-200 active:scale-95 shadow-lg`}
+                                disabled={loading}
+                            >
+                                Describe Image 🖼️
+                            </button>
+                            <button
+                                onClick={handleImageGeneration}
+                                className={`px-6 py-3 rounded-xl bg-rose-600 text-white font-semibold hover:bg-rose-700 transition-all duration-200 active:scale-95 shadow-lg`}
+                                disabled={loading}
+                            >
+                                Generate Image 🎨
+                            </button>
+                            {/* Status Indicators */}
+                            <div className="flex gap-4 text-sm">
+                                <span className={`px-3 py-1 rounded-full ${listening ? 'bg-red-500' : 'bg-gray-700'} text-white`}>
+                                    {listening ? 'LISTENING' : 'IDLE'}
+                                </span>
+                                <span className={`px-3 py-1 rounded-full ${speaking ? 'bg-blue-500' : 'bg-gray-700'} text-white`}>
+                                    {speaking ? 'SPEAKING' : 'SILENT'}
+                                </span>
+                                <span className={`px-3 py-1 rounded-full ${loading ? 'bg-yellow-500' : 'bg-gray-700'} text-white`}>
+                                    {loading ? 'PROCESSING' : 'READY'}
+                                </span>
+                                <span className={`px-3 py-1 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'} text-white`}>
+                                    {isOnline ? 'ONLINE' : 'OFFLINE'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Training Modal */}
+                    {showTrainingModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl border border-gray-700 w-full max-w-md">
+                                <h3 className="text-xl font-semibold text-white mb-4">Train J.A.R.V.I.S.</h3>
+                                <p className="text-gray-300 mb-2">
+                                    **Your last input:** <span className="font-medium text-blue-300">"{lastUserInput}"</span>
+                                </p>
+                                <p className="text-gray-300 mb-4">
+                                    **J.A.R.V.I.S.'s response:** <span className="font-medium text-purple-300">"{lastJarvisResponse}"</span>
+                                </p>
+                                <label htmlFor="correctedResponse" className="block text-gray-300 text-sm font-bold mb-2">
+                                    Enter the correct response:
+                                </label>
+                                <textarea
+                                    id="correctedResponse"
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-32 resize-none"
+                                    value={correctedResponse}
+                                    onChange={(e) => setCorrectedResponse(e.target.value)}
+                                    placeholder="Type the desired response here..."
+                                ></textarea>
+                                <div className="mt-6 flex justify-end gap-4">
+                                    <button
+                                        onClick={closeTrainingModal}
+                                        className="px-6 py-3 rounded-xl bg-gray-600 text-white font-semibold hover:bg-gray-700 transition-all duration-200 active:scale-95"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSaveCorrection}
+                                        className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-all duration-200 active:scale-95"
+                                        disabled={loading || !correctedResponse.trim()}
+                                    >
+                                        {loading ? 'Saving...' : 'Save Training'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Menu Modal */}
+                    {showMenuModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl border border-gray-700 w-full max-w-md">
+                                <h3 className="text-xl font-semibold text-white mb-6 text-center">J.A.R.V.I.S. Menu</h3>
+
+                                {/* AI Response Style */}
+                                <div className="mb-6">
+                                    <h4 className="text-lg font-medium text-gray-200 mb-3">AI Response Style</h4>
+                                    <div className="flex flex-wrap gap-3">
+                                        {['default', 'formal', 'casual', 'concise'].map((style) => (
+                                            <label key={style} className="inline-flex items-center">
+                                                <input
+                                                    type="radio"
+                                                    name="aiPersona"
+                                                    value={style}
+                                                    checked={aiPersona === style}
+                                                    onChange={(e) => setAiPersona(e.target.value)}
+                                                    className="form-radio h-4 w-4 text-blue-600"
+                                                />
+                                                <span className="ml-2 text-gray-300 capitalize">{style}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <h4 className="text-lg font-medium text-gray-200 mt-4 mb-3">Interface Theme</h4>
+                                        <div className="flex flex-wrap gap-3">
+                                            {['default', 'darker', 'futuristic'].map((theme) => (
+                                                <label key={theme} className="inline-flex items-center">
+                                                    <input
+                                                        type="radio"
+                                                        name="selectedTheme"
+                                                        value={theme}
+                                                        checked={selectedTheme === theme}
+                                                        onChange={(e) => setSelectedTheme(e.target.value)}
+                                                        className="form-radio h-4 w-4 text-blue-600"
+                                                    />
+                                                    <span className="ml-2 text-gray-300 capitalize">{theme}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                </div>
+
+                                {/* Voice Settings */}
+                                <div className="mb-6">
+                                    <h4 className="text-lg font-medium text-gray-200 mb-3">Voice Settings</h4>
+                                    <div className="mb-4">
+                                        <label htmlFor="voicePitch" className="block text-gray-400 text-sm mb-2">Voice Pitch ({voicePitch.toFixed(1)})</label>
+                                        <input
+                                            type="range"
+                                            id="voicePitch"
+                                            min="0.5"
+                                            max="2"
+                                            step="0.1"
+                                            value={voicePitch}
+                                            onChange={(e) => setVoicePitch(parseFloat(e.target.value))}
+                                            className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="voiceRate" className="block text-gray-400 text-sm mb-2">Voice Rate ({voiceRate.toFixed(1)})</label>
+                                        <input
+                                            type="range"
+                                            id="voiceRate"
+                                            min="0.5"
+                                            max="2"
+                                            step="0.1"
+                                            value={voiceRate}
+                                            onChange={(e) => setVoiceRate(parseFloat(e.target.value))}
+                                            className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Display Settings */}
+                                <div className="mb-6">
+                                    <h4 className="text-lg font-medium text-gray-200 mb-3">Display Settings</h4>
+                                    <div className="mb-4">
+                                        <label htmlFor="typingSpeed" className="block text-gray-400 text-sm mb-2">Typing Speed ({typingSpeed} ms/char)</label>
+                                        <input
+                                            type="range"
+                                            id="typingSpeed"
+                                            min="10"
+                                            max="100"
+                                            step="5"
+                                            value={typingSpeed}
+                                            onChange={(e) => setTypingSpeed(parseInt(e.target.value))}
+                                            className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={clearChatHistory}
+                                        className="w-full px-6 py-3 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-all duration-200 active:scale-95 shadow-md"
+                                    >
+                                        Clear Chat History
+                                    </button>
+                                </div>
+
+                                {/* Data Management */}
+                                <div className="mb-6">
+                                    <h4 className="text-lg font-medium text-gray-200 mb-3">Data Management</h4>
+                                    <button
+                                        onClick={confirmClearTrainingData}
+                                        className="w-full px-6 py-3 rounded-xl bg-orange-600 text-white font-semibold hover:bg-orange-700 transition-all duration-200 active:scale-95 shadow-md mb-3"
+                                    >
+                                        Clear All Trained Data
+                                    </button>
+                                    {/* View Trained Data */}
+                                    <div className="bg-gray-700 p-4 rounded-lg max-h-48 overflow-y-auto custom-scrollbar">
+                                        <h5 className="text-md font-medium text-gray-200 mb-2">Your Trained Responses:</h5>
+                                        {trainingData.length > 0 ? (
+                                            <ul className="list-disc list-inside text-gray-300 text-sm">
+                                                {trainingData.map((item, idx) => (
+                                                    <li key={idx} className="mb-1">
+                                                        **Q:** {item.userInput} <br /> **A:** {item.jarvisResponse}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-gray-400">No trained data yet.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* About Section */}
+                                <div>
+                                    <h4 className="text-lg font-medium text-gray-200 mb-3">About J.A.R.V.I.S.</h4>
+                                    <p className="text-gray-400 text-sm leading-relaxed">
+                                        This is a J.A.R.V.I.S.-like AI assistant built with React.
+                                        It uses Web Speech API for voice interaction and Gemini API for intelligent responses.
+                                        It also features user-trainable responses saved to Firestore.
+                                    </p>
+                                </div>
+
+                                <div className="mt-8 flex justify-end">
+                                    <button
+                                        onClick={() => setShowMenuModal(false)}
+                                        className="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all duration-200 active:scale-95 shadow-lg"
+                                    >
+                                        Close Menu
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Confirmation Modal for Clearing Trained Data */}
+                    {showConfirmClearModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl border border-gray-700 w-full max-w-md text-center">
+                                <h3 className="text-xl font-semibold text-white mb-4">Confirm Clear Trained Data</h3>
+                                <p className="text-gray-300 mb-6">
+                                    Are you sure you want to delete ALL your trained J.A.R.V.I.S. data? This action cannot be undone.
+                                </p>
+                                <div className="flex justify-center gap-4">
+                                    <button
+                                        onClick={() => setShowConfirmClearModal(false)}
+                                        className="px-6 py-3 rounded-xl bg-gray-600 text-white font-semibold hover:bg-gray-700 transition-all duration-200 active:scale-95"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={clearAllTrainingData}
+                                        className="px-6 py-3 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-all duration-200 active:scale-95"
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'Clearing...' : 'Clear Data'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Brainstorm Idea Modal */}
+                    {showBrainstormModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl border border-gray-700 w-full max-w-md">
+                                <h3 className="text-xl font-semibold text-white mb-4">Brainstorm Idea ✨</h3>
+                                <label htmlFor="brainstormTopic" className="block text-gray-300 text-sm font-bold mb-2">
+                                    What topic would you like to brainstorm ideas for?
+                                </label>
+                                <input
+                                    type="text"
+                                    id="brainstormTopic"
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                    value={brainstormTopic}
+                                    onChange={(e) => setBrainstormTopic(e.target.value)}
+                                    placeholder="e.g., 'new marketing campaign', 'weekend activities'"
+                                />
+                                <div className="mt-6 flex justify-end gap-4">
+                                    <button
+                                        onClick={() => { setShowBrainstormModal(false); setBrainstormTopic(''); }}
+                                        className="px-6 py-3 rounded-xl bg-gray-600 text-white font-semibold hover:bg-gray-700 transition-all duration-200 active:scale-95"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleGenerateBrainstorm}
+                                        className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-all duration-200 active:scale-95"
+                                        disabled={loading || !brainstormTopic.trim()}
+                                    >
+                                        {loading ? 'Generating...' : 'Generate Ideas'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Quiz Question Modal */}
+                    {showQuizModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl border border-gray-700 w-full max-w-md">
+                                <h3 className="text-xl font-semibold text-white mb-4">Ask Quiz Question ✨</h3>
+                                <label htmlFor="quizQuestion" className="block text-gray-300 text-sm font-bold mb-2">
+                                    Enter your quiz question:
+                                </label>
+                                <textarea
+                                    id="quizQuestion"
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-24 resize-none"
+                                    value={quizQuestion}
+                                    onChange={(e) => setQuizQuestion(e.target.value)}
+                                    placeholder="e.g., 'What is the capital of France?', 'How do you declare a variable in JavaScript?'"
+                                ></textarea>
+                                <div className="mt-4 mb-6">
+                                    <h4 className="text-lg font-medium text-gray-200 mb-2">Answer Format:</h4>
+                                    <div className="flex gap-4">
+                                        <label className="inline-flex items-center">
+                                            <input
+                                                type="radio"
+                                                name="quizFormat"
+                                                value="text"
+                                                checked={quizFormat === 'text'}
+                                                onChange={(e) => setQuizFormat(e.target.value)}
+                                                className="form-radio h-4 w-4 text-blue-600"
+                                            />
+                                            <span className="ml-2 text-gray-300">Text Answer</span>
+                                        </label>
+                                        <label className="inline-flex items-center">
+                                            <input
+                                                type="radio"
+                                                name="quizFormat"
+                                                value="code"
+                                                checked={quizFormat === 'code'}
+                                                onChange={(e) => setQuizFormat(e.target.value)}
+                                                className="form-radio h-4 w-4 text-blue-600"
+                                            />
+                                            <span className="ml-2 text-gray-300">Code Answer</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="mt-6 flex justify-end gap-4">
+                                    <button
+                                        onClick={() => { setShowQuizModal(false); setQuizQuestion(''); setQuizFormat('text'); }}
+                                        className="px-6 py-3 rounded-xl bg-gray-600 text-white font-semibold hover:bg-gray-700 transition-all duration-200 active:scale-95"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSendQuizQuestion}
+                                        className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-all duration-200 active:scale-95"
+                                        disabled={loading || !quizQuestion.trim()}
+                                    >
+                                        {loading ? 'Answering...' : 'Get Answer'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Creative Writing Modal */}
+                    {showCreativeWritingModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl border border-gray-700 w-full max-w-md">
+                                <h3 className="text-xl font-semibold text-white mb-4">Creative Writing ✨</h3>
+                                <label htmlFor="creativeWritingTopic" className="block text-gray-300 text-sm font-bold mb-2">
+                                    What topic should I write about?
+                                </label>
+                                <input
+                                    type="text"
+                                    id="creativeWritingTopic"
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                    value={creativeWritingTopic}
+                                    onChange={(e) => setCreativeWritingTopic(e.target.value)}
+                                    placeholder="e.g., 'a futuristic city', 'a lonely robot'"
+                                />
+                                <div className="mt-4 mb-6">
+                                    <h4 className="text-lg font-medium text-gray-200 mb-2">Content Type:</h4>
+                                    <div className="flex gap-4">
+                                        {['story', 'poem', 'script'].map((type) => (
+                                            <label key={type} className="inline-flex items-center">
+                                                <input
+                                                    type="radio"
+                                                    name="creativeWritingType"
+                                                    value={type}
+                                                    checked={creativeWritingType === type}
+                                                    onChange={(e) => setCreativeWritingType(e.target.value)}
+                                                    className="form-radio h-4 w-4 text-blue-600"
+                                                />
+                                                <span className="ml-2 text-gray-300 capitalize">{type}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="mt-6 flex justify-end gap-4">
+                                    <button
+                                        onClick={() => { setShowCreativeWritingModal(false); setCreativeWritingTopic(''); setCreativeWritingType('story'); }}
+                                        className="px-6 py-3 rounded-xl bg-gray-600 text-white font-semibold hover:bg-gray-700 transition-all duration-200 active:scale-95"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleGenerateCreativeContent}
+                                        className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-all duration-200 active:scale-95"
+                                        disabled={loading || !creativeWritingTopic.trim()}
+                                    >
+                                        {loading ? 'Generating...' : 'Generate Content'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Code Generation Modal */}
+                    {showCodeGenerationModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl border border-gray-700 w-full max-w-md">
+                                <h3 className="text-xl font-semibold text-white mb-4">Generate Code ✨</h3>
+                                <label htmlFor="codeGenerationPrompt" className="block text-gray-300 text-sm font-bold mb-2">
+                                    Describe the code you need:
+                                </label>
+                                <textarea
+                                    id="codeGenerationPrompt"
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-24 resize-none"
+                                    value={codeGenerationPrompt}
+                                    onChange={(e) => setCodeGenerationPrompt(e.target.value)}
+                                    placeholder="e.g., 'a function to reverse a string in Python', 'a simple React component for a button'"
+                                ></textarea>
+                                <div className="mt-4 mb-6">
+                                    <h4 className="text-lg font-medium text-gray-200 mb-2">Programming Language:</h4>
+                                    <select
+                                        id="codeLanguage"
+                                        className="w-full p-3 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                        value={codeLanguage}
+                                        onChange={(e) => setCodeLanguage(e.target.value)}
+                                    >
+                                        <option value="javascript">JavaScript</option>
+                                        <option value="python">Python</option>
+                                        <option value="java">Java</option>
+                                        <option value="c++">C++</option>
+                                        <option value="html">HTML</option>
+                                        <option value="css">CSS</option>
+                                        <option value="react">React</option>
+                                        <option value="swift">Swift</option>
+                                        <option value="go">Go</option>
+                                        <option value="php">PHP</option>
+                                    </select>
+                                </div>
+                                <div className="mt-6 flex justify-end gap-4">
+                                    <button
+                                        onClick={() => { setShowCodeGenerationModal(false); setCodeGenerationPrompt(''); setCodeLanguage('javascript'); }}
+                                        className="px-6 py-3 rounded-xl bg-gray-600 text-white font-semibold hover:bg-gray-700 transition-all duration-200 active:scale-95"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleGenerateCode}
+                                        className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-all duration-200 active:scale-95"
+                                        disabled={loading || !codeGenerationPrompt.trim()}
+                                    >
+                                        {loading ? 'Generating...' : 'Generate Code'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Image Description Modal */}
+                    {showImageDescriptionModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl border border-gray-700 w-full max-w-md">
+                                <h3 className="text-xl font-semibold text-white mb-4">Describe Image 🖼️</h3>
+                                <label htmlFor="imageUpload" className="block text-gray-300 text-sm font-bold mb-2">
+                                    Upload an image:
+                                </label>
+                                <input
+                                    type="file"
+                                    id="imageUpload"
+                                    accept="image/*"
+                                    onChange={handleImageFileChange}
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600"
+                                />
+                                {imagePreviewUrl && (
+                                    <div className="mt-4 text-center">
+                                        <img src={imagePreviewUrl} alt="Image Preview" className="max-w-full h-auto rounded-lg mx-auto" />
+                                    </div>
+                                )}
+                                <label htmlFor="imageDescriptionPrompt" className="block text-gray-300 text-sm font-bold mt-4 mb-2">
+                                    What would you like to know about this image? (Optional)
+                                </label>
+                                <textarea
+                                    id="imageDescriptionPrompt"
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-24 resize-none"
+                                    value={imageDescriptionPrompt}
+                                    onChange={(e) => setImageDescriptionPrompt(e.target.value)}
+                                    placeholder="e.g., 'What is in this picture?', 'Describe the main subject.'"
+                                ></textarea>
+                                <div className="mt-6 flex justify-end gap-4">
+                                    <button
+                                        onClick={() => { setShowImageDescriptionModal(false); setImageFile(null); setImagePreviewUrl(null); setImageDescriptionPrompt(''); }}
+                                        className="px-6 py-3 rounded-xl bg-gray-600 text-white font-semibold hover:bg-gray-700 transition-all duration-200 active:scale-95"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleAnalyzeImage}
+                                        className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-all duration-200 active:scale-95"
+                                        disabled={loading || !imageFile}
+                                    >
+                                        {loading ? 'Analyzing...' : 'Analyze Image'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Image Generation Modal */}
+                    {showImageGenerationModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl border border-gray-700 w-full max-w-md">
+                                <h3 className="text-xl font-semibold text-white mb-4">Generate Image 🎨</h3>
+                                <label htmlFor="imageGenerationPrompt" className="block text-gray-300 text-sm font-bold mb-2">
+                                    Describe the image you want to generate:
+                                </label>
+                                <textarea
+                                    id="imageGenerationPrompt"
+                                    className="w-full p-3 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 h-24 resize-none"
+                                    value={imageGenerationPrompt}
+                                    onChange={(e) => setImageGenerationPrompt(e.target.value)}
+                                    placeholder="e.g., 'a futuristic cityscape at sunset, highly detailed, cyberpunk style'"
+                                ></textarea>
+                                {isImageGenerating && (
+                                    <div className="mt-4 text-center text-gray-400">
+                                        <div className="animate-spin inline-block w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+                                        <p className="mt-2">Generating image, please wait...</p>
+                                    </div>
+                                )}
+                                {generatedImageUrl && !isImageGenerating && (
+                                    <div className="mt-4 text-center">
+                                        <img src={generatedImageUrl} alt="Generated Image" className="max-w-full h-auto rounded-lg mx-auto" />
+                                    </div>
+                                )}
+                                <div className="mt-6 flex justify-end gap-4">
+                                    <button
+                                        onClick={() => { setShowImageGenerationModal(false); setImageGenerationPrompt(''); setGeneratedImageUrl(null); setIsImageGenerating(false); }}
+                                        className="px-6 py-3 rounded-xl bg-gray-600 text-white font-semibold hover:bg-gray-700 transition-all duration-200 active:scale-95"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleGenerateImage}
+                                        className="px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-all duration-200 active:scale-95"
+                                        disabled={loading || isImageGenerating || !imageGenerationPrompt.trim()}
+                                    >
+                                        {loading ? 'Generating...' : 'Generate Image'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Render the React App component into the 'root' div
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
